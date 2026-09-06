@@ -1,3 +1,5 @@
+import os.path
+
 import uvicorn
 from fastapi import FastAPI, UploadFile, Depends, BackgroundTasks
 from starlette.middleware.cors import CORSMiddleware
@@ -5,8 +7,9 @@ from starlette.staticfiles import StaticFiles
 
 from knowledge.core.deps import get_upload_file_service
 from knowledge.core.paths import get_front_page_dir
-from knowledge.schema.upload_schema import UploadResponse
+from knowledge.schema.upload_schema import UploadResponse, TaskStatusResponse
 from knowledge.service.upload_service import UploadService
+from knowledge.utils.task_util import get_task_info
 
 
 def create_route(app:FastAPI):
@@ -41,6 +44,11 @@ def create_route(app:FastAPI):
         #3.返回响应数据
         return UploadResponse(message= f"文件:{file.filename}上传成功，",task_id=task_id)
 
+    @app.get("/status/{task_id}")
+    def get_task_status_endpoint(task_id: str):
+        task_info = get_task_info(task_id)
+        return TaskStatusResponse(**task_info)
+
 
 def create_fastapi()->FastAPI:
     """
@@ -62,7 +70,9 @@ def create_fastapi()->FastAPI:
     )
     #3.挂载静态资源
     page_dir = get_front_page_dir()
-    app.mount("/front",StaticFiles(directory=page_dir))
+
+    if page_dir and os.path.exists(page_dir):
+        app.mount("/front", StaticFiles(directory=page_dir))
 
 
     create_route(app)
@@ -76,4 +86,4 @@ if __name__ == '__main__':
     :param2:  服务ip地址
     :param3:  端口号
     """
-    uvicorn.run(app=create_fastapi(),host="0.0.0.0",port=8000)
+    uvicorn.run(app=create_fastapi(),host="0.0.0.0",port=8001)

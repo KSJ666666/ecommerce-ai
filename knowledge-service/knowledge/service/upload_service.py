@@ -1,16 +1,22 @@
+
+import logging
 import os
 import shutil
+import time
 import uuid
-import logging
 from datetime import datetime
 
-import logger
 from fastapi import UploadFile
 
 from knowledge.core.paths import get_local_base_dir
 from knowledge.processor.improt_processor.exceptions import FileProcessingError
 from knowledge.processor.improt_processor.main_graph import import_app
 from knowledge.utils.client.storage_clients import StorageClients
+from knowledge.utils.task_util import add_running_task, add_done_task, add_node_duration, update_task_status, \
+    TASK_STATUS_PROCESSING, TASK_STATUS_COMPLETED, TASK_STATUS_FAILED
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class UploadService:
@@ -28,6 +34,10 @@ class UploadService:
         """
         #1.构建任务id
         task_id = str(uuid.uuid4().hex[:8])
+
+        add_running_task(task_id, "upload_file")
+
+        start_time = time.time()
         #2.构建日期目录并且拼接到临时目录
         base_file_dir = self.get_base_dir()
         #3.构建file_dir  如：knowledge/temp_data/20251020/task_id
@@ -38,10 +48,15 @@ class UploadService:
         #5.文件上传至minio中
         self.save_upload_file_to_minio(import_file_path, file.filename)
 
+        end_time = time.time()
+        add_done_task(task_id, "upload_file")
+        add_node_duration(task_id, "upload_file", end_time - start_time)
+
         # 6. 返回图谱的信息
         return task_id, import_file_path, file_dir
 
     def run_import_graph(self, task_id, import_file_path, file_dir):
+        update_task_status(task_id, TASK_STATUS_PROCESSING)
         graph_state = {
             "task_id": task_id,
             "import_file_path": import_file_path,
@@ -51,10 +66,16 @@ class UploadService:
 
         # stream:迭代整个graph图状态可以得到每一个节点的事件(节点的名字以及节点操作完state之后的新状态)
 
-        for event in import_app.stream(graph_state):
-            for key, value in event.items():
-                logger.info(f"当前正在执行的节点：{key}")
+        try:
+            for event in import_app.stream(graph_state):
+                for key, value in event.items():
+                    logger.info(f"当前正在执行的节点：{key}")
+            update_task_status(task_id, TASK_STATUS_COMPLETED)
+        except Exception as e:
+            logger.error(f"[{task_id}] 执行导入过程中出现异常 原因{str(e)}")
 
+            # 3.2 更新任务为失败
+            update_task_status(task_id, TASK_STATUS_FAILED)
 
 
     def get_base_dir(self):
@@ -97,7 +118,7 @@ class UploadService:
         try:
             minio_client = StorageClients.get_minio_client()
         except ConnectionError as e:
-            logger.info(f"{filename.filename}上传至minio失败 原因:{str(e)}")
+            logger.error(f"MinIO客户端获取失败 原因:{str(e)}")
             return
         #2.获取minio的相关信息
         minio_bucket = os.getenv("MINIO_BUCKET_NAME")
