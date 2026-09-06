@@ -72,13 +72,17 @@ class _MilvusInserter:
         self._collection_name = collection_name
 
     def insert_rows(self, data: List[Dict[str, Any]]):
-        # 1. 插入
-        inserted_result = self._milvus_client.insert(collection_name=self._collection_name, data=data)
+        # 1. 插入前剔除主键：chunk_id是auto_id主键，携带会被Milvus拒绝
+        #    (code=1100, more fieldData has pass in)，同时保证同一批chunk被重复插入时不再炸
+        clean_rows = [{k: v for k, v in chunk.items() if k != 'chunk_id'} for chunk in data]
 
-        # 2. 得到每一个chunk的id
+        # 2. 插入
+        inserted_result = self._milvus_client.insert(collection_name=self._collection_name, data=clean_rows)
+
+        # 3. 得到每一个chunk的id
         chunk_ids = inserted_result.get('ids')
 
-        # 3. 回填到chunk中
+        # 4. 回填到chunk中
         for chunk_id, chunk in zip(chunk_ids, data):
             chunk['chunk_id'] = chunk_id
 
