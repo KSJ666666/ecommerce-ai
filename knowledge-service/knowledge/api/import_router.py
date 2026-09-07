@@ -86,4 +86,4 @@ if __name__ == '__main__':
     :param2:  服务ip地址
     :param3:  端口号
     """
-    uvicorn.run(app=create_fastapi(),host="0.0.0.0",port=8001)
+    uvicorn.run(app=create_fastapi(),host="0.0.0.0",port=8001  )
