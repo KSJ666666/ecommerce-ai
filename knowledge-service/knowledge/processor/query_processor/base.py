@@ -9,7 +9,7 @@ from knowledge.processor.query_processor.config import QueryConfig, get_config
 from knowledge.processor.query_processor.exceptions import QueryProcessError
 from knowledge.utils.task_util import add_running_task, add_done_task, get_task_status, get_running_task_list, \
     get_done_task_list
-from knowledge.utils.sse_util import push_sse_event, SSEEvent
+
 
 T = TypeVar("T")  # 泛型状态类型
 
