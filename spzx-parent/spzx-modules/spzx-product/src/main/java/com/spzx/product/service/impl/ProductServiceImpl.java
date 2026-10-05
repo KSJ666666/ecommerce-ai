@@ -135,14 +135,23 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         return product;
     }
 
-
+  //采用延迟双删解决热点信息与数据库信息不一致的问题
     @Override
     public int updateProduct(Product product) {
+        //获取productsku
+        List<ProductSku> productSkuList = product.getProductSkuList();
+        //得到skuid
+        List<Long> productSkuIds = productSkuList.stream().map(ProductSku::getProductId).toList();
+
+        //根据id删除已缓存的sku
+        productSkuIds.forEach(skuId->{
+            redisTemplate.delete("product:productSku"+ skuId);
+        });
         //1.更新Product
         productMapper.updateById(product);
 
         //2.更新SKU   List<ProductSku>
-        List<ProductSku> productSkuList = product.getProductSkuList();
+
         if (CollectionUtils.isEmpty(productSkuList)) {
             throw new ServiceException("SKU数据为空");
         }
@@ -161,6 +170,19 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                 .selectOne(new LambdaQueryWrapper<ProductDetails>().eq(ProductDetails::getProductId, product.getId()));
         productDetails.setImageUrls(String.join(",", product.getDetailsImageUrlList()));
         productDetailsMapper.updateById(productDetails);
+        //延时双删
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        //再次删除
+        //遍历所有的SkuId
+        productSkuIds.forEach(skuId->{
+            //将Redis中缓存的商品Sku信息删除
+            redisTemplate.delete("product:productSku:"+skuId);
+        });
 
         return 1;
     }
