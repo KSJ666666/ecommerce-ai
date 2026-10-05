@@ -19,11 +19,13 @@ import com.spzx.product.service.IProductService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -231,7 +233,64 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
 
     @Override
     public ProductSku getProductSku(Long skuId) {
+        try {
+            //拼接向Redis中查询商品Sku信息的key
+            String productSkuKey = "product:productSku:" + skuId;
+            //向Redis中查询商品Sku信息
+            ProductSku productSku = (ProductSku) redisTemplate.opsForValue().get(productSkuKey);
+            if (null != productSku) {
+                System.out.println("命中缓存");
+                //从Redis中查询到商品Sku信息，直接返回
+                return productSku;
+            }
+            //使用UUID生成一个随机字符串作为锁的值
+            String lockValue = UUID.randomUUID().toString().replaceAll("-", "");
+            //设置上分布式锁的key
+            String lockKey = "product:productSku:lock:" + skuId;
+            //上分布式锁
+            Boolean flag = redisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, 3, TimeUnit.SECONDS);
+            if (flag) {
+                try {
+                    //上锁成功，从数据库中查询商品Sku信息
+                    productSku = getProductSkuByDb(skuId);
+                    //将从数据库查询出来的商品Sku信息放到缓存中
+                    redisTemplate.opsForValue().set(productSkuKey,productSku);
+                    return productSku;
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    //设置Lua脚本
+                    String luaScript = """
+                            if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end
+                            """;
+                    //执行Lua脚本
+                    //创建RedisScript对象
+                    RedisScript<Boolean> redisScript = RedisScript.of(luaScript, Boolean.class);
+                    //设置Redis中的key
+                    List<String> keys = Arrays.asList(lockKey);
+                    redisTemplate.execute(redisScript,keys,lockValue);
+                }
+            } else {
+                try {
+                    //上锁失败，等待重试
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                //自旋
+                return getProductSku(skuId);
+            }
+        } catch (Exception e) {
+            //兜底：如果连接Redis出现异常，直接从数据库中查询
+            ProductSku productSkuByDB = getProductSkuByDb(skuId);
+            return productSkuByDB;
+        }
+
+    }
+
+    public ProductSku getProductSkuByDb(Long skuId){
         return productSkuMapper.selectById(skuId);
+
     }
 
 

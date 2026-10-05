@@ -353,7 +353,7 @@ const data = reactive({
       Authorization: "Bearer " + getToken()
     },
     // 图片上传的方法地址:
-    url: "http://localhost/dev-api/file/upload"
+    url: "/dev-api/file/upload"
   }
 });
 
