@@ -17,6 +17,8 @@ import com.spzx.order.mapper.OrderItemMapper;
 import com.spzx.order.mapper.OrderLogMapper;
 import com.spzx.order.service.IOrderInfoService;
 import com.spzx.product.api.RemoteProductService;
+import com.spzx.product.api.domain.ProductDetails;
+import com.spzx.product.api.domain.ProductSku;
 import com.spzx.user.api.RemoteUserAddressService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,12 +88,12 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         TradeVo tradeVo = new TradeVo();
         //结算商品列表
         R<List<CartInfo>> checkedCartInfo = remoteCartService.getCheckedCartInfo(SecurityConstants.INNER);
-        if (R.FAIL == checkedCartInfo.getCode()){
+        if (R.FAIL == checkedCartInfo.getCode()) {
             throw new ServiceException(checkedCartInfo.getMsg());
         }
-        List<OrderItem>orderItemList = new ArrayList<>();
+        List<OrderItem> orderItemList = new ArrayList<>();
         List<CartInfo> cartInfoList = checkedCartInfo.getData();
-        if (!CollectionUtils.isEmpty(cartInfoList)){
+        if (!CollectionUtils.isEmpty(cartInfoList)) {
             orderItemList = cartInfoList.stream().map(cartInfo -> {
                 OrderItem orderItem = new OrderItem();
                 BeanUtils.copyProperties(cartInfo, orderItem);
@@ -107,11 +109,36 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
             for (OrderItem orderItem : orderItemList) {
                 BigDecimal skuPrice = orderItem.getSkuPrice();
                 Integer skuNum = orderItem.getSkuNum();
-                bigDecimal = bigDecimal.add(skuPrice.multiply(new BigDecimal(skuNum))) ;
+                bigDecimal = bigDecimal.add(skuPrice.multiply(new BigDecimal(skuNum)));
             }
             tradeVo.setTotalAmount(bigDecimal);
 
         }
+
+        return tradeVo;
+    }
+
+    @Override
+    public TradeVo buy(Long skuId) {
+        TradeVo tradeVo = new TradeVo();
+        R<ProductSku> productSkuR = remoteProductService.getProductSku(skuId, SecurityConstants.INNER);
+        if (R.FAIL == productSkuR.getCode()) {
+            throw new ServiceException(productSkuR.getMsg());
+        }
+        ProductSku productSku = productSkuR.getData();
+
+        OrderItem orderItem = new OrderItem();
+        BeanUtils.copyProperties(productSku, orderItem);
+
+
+        orderItem.setSkuNum(1);
+        orderItem.setSkuPrice(productSku.getSalePrice());
+
+        tradeVo.setOrderItemList(List.of(orderItem));
+
+        tradeVo.setTotalAmount(productSku.getSalePrice());
+
+        tradeVo.setTradeNo(UUID.randomUUID().toString().replace("-", ""));
 
         return tradeVo;
     }

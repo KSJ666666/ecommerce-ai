@@ -24,4 +24,6 @@ public interface IOrderInfoService extends IService<OrderInfo> {
     public OrderInfo selectOrderInfoById(Long id);
 
     TradeVo trade();
+
+    TradeVo buy(Long skuId);
 }

@@ -76,6 +76,13 @@ public class OrderInfoController extends BaseController {
         return success(tradeVo);
     }
 
+    @Operation(summary = "立即购买按钮")
+    @GetMapping("/buy/{skuId}")
+    public AjaxResult buy(@PathVariable Long skuId){
+        TradeVo tradeVo = orderInfoService.buy(skuId);
+        return success(tradeVo);
+    }
+
 
 
 
