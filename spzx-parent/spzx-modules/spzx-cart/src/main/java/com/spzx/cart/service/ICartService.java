@@ -11,4 +11,12 @@ public interface ICartService {
     List<CartInfo> cartList();
 
     void checkCart(Long skuId, Integer status);
+
+    void deleteCart(Long skuId);
+
+    void clearCart();
+
+    void allCheckCart(Integer status);
+
+    List<CartInfo> getCheckedCartInfo();
 }

@@ -67,6 +67,46 @@ public class CartServiceImpl implements ICartService {
     }
 
     @Override
+    public void deleteCart(Long skuId) {
+        String cartKey = getCartKey();
+
+        redisTemplate.opsForHash().delete(cartKey,String.valueOf(skuId));
+
+    }
+
+    @Override
+    public void clearCart() {
+        String cartKey = getCartKey();
+
+        redisTemplate.delete(cartKey);
+
+    }
+
+    @Override
+    public void allCheckCart(Integer status) {
+        String cartKey = getCartKey();
+        List<CartInfo>cartInfos = redisTemplate.opsForHash().values(cartKey);
+
+        cartInfos.forEach(cartInfo -> {
+            cartInfo.setIsChecked(status);
+            redisTemplate.opsForHash().put(cartKey,String.valueOf(cartInfo.getSkuId()),cartInfo);
+        });
+
+    }
+
+    @Override
+    public List<CartInfo> getCheckedCartInfo() {
+
+        String cartKey = getCartKey();
+        List<CartInfo>cartInfoList = redisTemplate.opsForHash().values(cartKey);
+        //获取checkedId = 1的
+        List<CartInfo> cartInfoCheckeds = cartInfoList.stream().filter(cartInfo -> cartInfo.getIsChecked() == 1).collect(Collectors.toList());
+
+
+        return cartInfoCheckeds;
+    }
+
+    @Override
     public void checkCart(Long skuId, Integer status) {
         String cartKey = getCartKey();
 

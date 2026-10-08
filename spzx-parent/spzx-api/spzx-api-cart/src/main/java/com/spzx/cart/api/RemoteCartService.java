@@ -16,5 +16,7 @@ import java.util.List;
         value = ServiceNameConstants.CART_SERVICE,
         fallbackFactory = RemoteCartFallbackFactory.class)
 public interface RemoteCartService {
+    @GetMapping("/getCheckedCartInfo")
+     R<List<CartInfo>> getCheckedCartInfo(@RequestHeader(SecurityConstants.FROM_SOURCE)String source);
 
 }
