@@ -14,6 +14,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -35,15 +37,15 @@ public class CartServiceImpl implements ICartService {
             cartInfo.setSkuNum(Math.min(cartInfo.getSkuNum() + num,99));
         }
         else { //证明此商品是第一次加入购物车，需要给前端返回购物详情
-            CartInfo cartInfo1 = new CartInfo();
+             cartInfo = new CartInfo();
             //设置购物车中商品数量为1
-            cartInfo1.setSkuNum(1);
+            cartInfo.setSkuNum(1);
             //设置商品skuID
-            cartInfo1.setSkuId(skuId);
+            cartInfo.setSkuId(skuId);
             //设置添加购物车的时间
-            cartInfo1.setCreateTime(new Date());
+            cartInfo.setCreateTime(new Date());
             //设置添加购物车的用户的名字
-            cartInfo1.setCreateBy(SecurityContextHolder.getUserName());
+            cartInfo.setCreateBy(SecurityContextHolder.getUserName());
             //远程调用商品微服务，获取sku详情
             R<ProductSku> productSku = productService.getProductSku(skuId, SecurityConstants.INNER);
             if (productSku.getCode() == R.FAIL){//如果调用失败
@@ -52,17 +54,54 @@ public class CartServiceImpl implements ICartService {
             //获取商品信息
             ProductSku productSku1 = productSku.getData();
             //设置商品信息
-            cartInfo1.setSkuName(productSku1.getSkuName());
-            cartInfo1.setThumbImg(productSku1.getThumbImg());
+            cartInfo.setSkuName(productSku1.getSkuName());
+            cartInfo.setThumbImg(productSku1.getThumbImg());
             //设置放入购物车时的价格
-            cartInfo1.setCartPrice(productSku1.getSalePrice());
+            cartInfo.setCartPrice(productSku1.getSalePrice());
             //设置商品Sku的实时价格
-            cartInfo1.setSkuPrice(productSku1.getSalePrice());
+            cartInfo.setSkuPrice(productSku1.getSalePrice());
 
         }
         redisTemplate.opsForHash().put(cartKey,String.valueOf(skuId),cartInfo);
 
     }
+
+    @Override
+    public void checkCart(Long skuId, Integer status) {
+        String cartKey = getCartKey();
+
+          CartInfo cartInfo =(CartInfo) redisTemplate.opsForHash().get(cartKey, String.valueOf(skuId));
+
+          cartInfo.setIsChecked(status);
+
+          redisTemplate.opsForHash().put(cartKey,String.valueOf(skuId),cartInfo);
+
+
+    }
+
+    @Override
+    public List<CartInfo> cartList() {
+        String cartKey = getCartKey();
+
+        List<CartInfo>cartInfoList = redisTemplate.opsForHash().values(cartKey);
+        //更新数据库中真实的商品价格
+        cartInfoList.forEach(cartInfo -> {
+            R<ProductSku> productSkuR = productService.getProductSku(cartInfo.getSkuId(), SecurityConstants.INNER);
+
+            if (productSkuR.getCode() == R.FAIL){
+                throw new RuntimeException(productSkuR.getMsg());
+
+            }
+
+            ProductSku productSku = productSkuR.getData();
+            cartInfo.setSkuPrice(productSku.getSalePrice());
+
+            redisTemplate.opsForHash().put(cartKey,String.valueOf(cartInfo.getSkuId()),cartInfo);
+        });
+
+        return cartInfoList;
+    }
+
     /**
      * 设置购物车key
      * @return
