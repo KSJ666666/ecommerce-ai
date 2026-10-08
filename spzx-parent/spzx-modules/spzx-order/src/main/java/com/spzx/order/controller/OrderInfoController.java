@@ -1,6 +1,8 @@
 package com.spzx.order.controller;
 
 import com.github.pagehelper.PageHelper;
+import com.spzx.cart.api.RemoteCartService;
+import com.spzx.cart.api.domain.CartInfo;
 import com.spzx.common.core.domain.R;
 import com.spzx.common.core.utils.poi.ExcelUtil;
 import com.spzx.common.core.web.controller.BaseController;
@@ -30,6 +32,7 @@ import java.util.List;
 public class OrderInfoController extends BaseController {
     @Autowired
     private IOrderInfoService orderInfoService;
+
 
     /**
      * 查询订单列表
@@ -65,6 +68,17 @@ public class OrderInfoController extends BaseController {
     public AjaxResult getInfo(@PathVariable("id") Long id) {
         return success(orderInfoService.selectOrderInfoById(id));
     }
+
+    @Operation(summary = "获取去结算详情页")
+    @GetMapping("/trade")
+    public AjaxResult trade(){
+        TradeVo tradeVo = orderInfoService.trade();
+        return success(tradeVo);
+    }
+
+
+
+
 
 
 
