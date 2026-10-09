@@ -89,6 +89,12 @@ public class OrderInfoController extends BaseController {
         Long orderId = orderInfoService.submit(orderForm);
         return success(orderId);
     }
+    @Operation(summary = "根据订单id获取订单信息")
+    @GetMapping("/getOrderInfo/{orderId}")
+    public AjaxResult getOrderInfo(@PathVariable Long orderId){
+        //getInfo方法返回的已经是AjaxResult，不能再包一层success，否则响应体会多嵌套一层导致前端取不到数据
+        return getInfo(orderId);
+    }
 
 
 

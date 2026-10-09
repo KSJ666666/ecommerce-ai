@@ -111,6 +111,9 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
                 OrderItem orderItem = new OrderItem();
                 BeanUtils.copyProperties(cartInfo, orderItem);
                 orderItem.setId(null);
+                //清空购物车带来的时间，否则订单项的创建时间会显示成加入购物车的时间
+                orderItem.setCreateTime(null);
+                orderItem.setUpdateTime(null);
                 return orderItem;
             }).collect(Collectors.toList());
 
@@ -146,6 +149,9 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         OrderItem orderItem = new OrderItem();
         BeanUtils.copyProperties(productSku, orderItem);
         orderItem.setId(null); // Set the ID to null to generate a new one
+        //清空从商品sku复制过来的时间，否则入库时会沿用sku的创建时间
+        orderItem.setCreateTime(null);
+        orderItem.setUpdateTime(null);
 
 
         orderItem.setSkuNum(1);
