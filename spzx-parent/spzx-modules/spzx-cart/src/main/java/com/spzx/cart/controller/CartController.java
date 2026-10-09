@@ -74,7 +74,11 @@ public class CartController extends BaseController {
         return R.ok(cartInfos);
     }
 
-
-
-
+    @InnerAuth
+    @Operation(summary = "远程调用购物车微服务，清除已选择的购物车列表项")
+    @GetMapping("/clearCheckedCartInfo")
+    public R clearCheckedCartInfo(){
+        cartService.clearCheckedCartInfo();
+        return R.ok();
+    }
 }

@@ -107,6 +107,14 @@ public class CartServiceImpl implements ICartService {
     }
 
     @Override
+    public void clearCheckedCartInfo() {
+        String cartKey = getCartKey();
+        getCheckedCartInfo().forEach(cartInfo -> {
+            redisTemplate.opsForHash().delete(cartKey,String.valueOf(cartInfo.getSkuId()));
+        });
+    }
+
+    @Override
     public void checkCart(Long skuId, Integer status) {
         String cartKey = getCartKey();
 
@@ -148,6 +156,7 @@ public class CartServiceImpl implements ICartService {
      */
     public String getCartKey(){
         Long userId = SecurityContextHolder.getUserId();
+
         return "user:cart"+userId;
     }
 }

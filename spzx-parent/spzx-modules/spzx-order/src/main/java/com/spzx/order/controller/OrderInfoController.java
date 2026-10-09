@@ -83,6 +83,13 @@ public class OrderInfoController extends BaseController {
         return success(tradeVo);
     }
 
+    @Operation(summary = "提交订单")
+    @PostMapping("/submitOrder")
+    public AjaxResult submit(@RequestBody OrderForm orderForm){
+        Long orderId = orderInfoService.submit(orderForm);
+        return success(orderId);
+    }
+
 
 
 

@@ -19,4 +19,6 @@ public interface RemoteCartService {
     @GetMapping("/getCheckedCartInfo")
      R<List<CartInfo>> getCheckedCartInfo(@RequestHeader(SecurityConstants.FROM_SOURCE)String source);
 
+    @GetMapping("/clearCheckedCartInfo")
+    R clearCheckedCartInfo(@RequestHeader(SecurityConstants.FROM_SOURCE)String source);
 }

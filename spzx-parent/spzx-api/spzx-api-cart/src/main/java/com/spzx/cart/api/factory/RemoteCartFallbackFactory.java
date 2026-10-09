@@ -27,6 +27,11 @@ public class RemoteCartFallbackFactory implements FallbackFactory<RemoteCartServ
             public R<List<CartInfo>> getCheckedCartInfo(String source) {
                 return R.fail("远程调用失败，原因是：" + throwable.getMessage());
             }
+
+            @Override
+            public R clearCheckedCartInfo(String source) {
+                return R.fail("远程调用购物车服务失败，原因是：" + throwable.getMessage());
+            }
         };
     }
 }

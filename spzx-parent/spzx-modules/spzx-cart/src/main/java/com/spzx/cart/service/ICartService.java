@@ -19,4 +19,6 @@ public interface ICartService {
     void allCheckCart(Integer status);
 
     List<CartInfo> getCheckedCartInfo();
+
+    void clearCheckedCartInfo();
 }

@@ -6,32 +6,39 @@ import com.mysql.cj.x.protobuf.MysqlxCrud;
 import com.spzx.cart.api.RemoteCartService;
 import com.spzx.cart.api.domain.CartInfo;
 import com.spzx.common.core.constant.SecurityConstants;
+import com.spzx.common.core.context.SecurityContextHolder;
 import com.spzx.common.core.domain.R;
 import com.spzx.common.core.exception.ServiceException;
 import com.spzx.common.rabbit.service.RabbitService;
 import com.spzx.order.api.domain.OrderInfo;
 import com.spzx.order.api.domain.OrderItem;
+import com.spzx.order.domain.OrderLog;
+import com.spzx.order.domain.vo.OrderForm;
 import com.spzx.order.domain.vo.TradeVo;
 import com.spzx.order.mapper.OrderInfoMapper;
 import com.spzx.order.mapper.OrderItemMapper;
 import com.spzx.order.mapper.OrderLogMapper;
 import com.spzx.order.service.IOrderInfoService;
+import com.spzx.order.service.OrderItemService;
 import com.spzx.product.api.RemoteProductService;
 import com.spzx.product.api.domain.ProductDetails;
 import com.spzx.product.api.domain.ProductSku;
 import com.spzx.user.api.RemoteUserAddressService;
+import com.spzx.user.domain.UserAddress;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
+@Transactional
 @Service
 public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo> implements IOrderInfoService {
     @Autowired
@@ -57,6 +64,9 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
 
     @Autowired
     RabbitService rabbitService; //来自于公共模块：spzx-common-rabbit
+
+    @Autowired
+    private OrderItemService orderItemService;
 
     /**
      * 查询订单列表
@@ -86,6 +96,9 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
     @Override
     public TradeVo trade() {
         TradeVo tradeVo = new TradeVo();
+
+
+
         //结算商品列表
         R<List<CartInfo>> checkedCartInfo = remoteCartService.getCheckedCartInfo(SecurityConstants.INNER);
         if (R.FAIL == checkedCartInfo.getCode()) {
@@ -97,6 +110,7 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
             orderItemList = cartInfoList.stream().map(cartInfo -> {
                 OrderItem orderItem = new OrderItem();
                 BeanUtils.copyProperties(cartInfo, orderItem);
+                orderItem.setId(null);
                 return orderItem;
             }).collect(Collectors.toList());
 
@@ -104,6 +118,8 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
 
             String tradeNo = UUID.randomUUID().toString().replace("-", "");
             tradeVo.setTradeNo(tradeNo);
+
+            redisTemplate.opsForValue().set("user:trade:" + tradeNo, tradeNo,5, TimeUnit.MINUTES);
             //计算总的需要支付的价钱
             BigDecimal bigDecimal = new BigDecimal(0);
             for (OrderItem orderItem : orderItemList) {
@@ -129,6 +145,7 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
 
         OrderItem orderItem = new OrderItem();
         BeanUtils.copyProperties(productSku, orderItem);
+        orderItem.setId(null); // Set the ID to null to generate a new one
 
 
         orderItem.setSkuNum(1);
@@ -138,9 +155,90 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
 
         tradeVo.setTotalAmount(productSku.getSalePrice());
 
-        tradeVo.setTradeNo(UUID.randomUUID().toString().replace("-", ""));
+        String tradeNo = UUID.randomUUID().toString().replace("-", "");
+
+        tradeVo.setTradeNo(tradeNo);
+        redisTemplate.opsForValue().set("user:trade:" + tradeNo, tradeNo,5, TimeUnit.MINUTES);
 
         return tradeVo;
+    }
+
+    @Override
+    public Long submit(OrderForm orderForm) {
+        //1.防止订单重复提交
+        String tradeNo = orderForm.getTradeNo();
+        String tradeNoStr = (String) redisTemplate.opsForValue().get("user:trade:" + tradeNo);
+        if (!tradeNo.equals(tradeNoStr)) {
+            throw new ServiceException("订单重复提交或订单超时");
+        }
+        redisTemplate.delete("user:trade:" + tradeNo);
+        String remark = orderForm.getRemark();
+        BigDecimal feightFee = orderForm.getFeightFee();
+        Long userAddressId = orderForm.getUserAddressId();
+        //2.添加订单项
+        //2.1插入订单
+        OrderInfo orderInfo = new OrderInfo();
+        List<OrderItem> orderItemList = orderForm.getOrderItemList();
+        orderInfo.setOrderItemList(orderItemList);
+
+        orderInfo.setOrderNo(UUID.randomUUID().toString().replace("-", ""));
+
+        orderInfo.setOrderStatus(0);
+
+        orderInfo.setUserId(SecurityContextHolder.getUserId());
+        orderInfo.setNickName(SecurityContextHolder.getUserName());
+        orderInfo.setCreateBy(SecurityContextHolder.getUserName());
+
+        orderInfo.setCouponAmount(new BigDecimal(0));
+
+        orderInfo.setFeightFee(feightFee);
+
+        orderInfo.setRemark(remark);
+        //设置价格
+        BigDecimal totalAmount = new BigDecimal(0);
+        for (OrderItem orderItem : orderItemList) {
+            Integer skuNum = orderItem.getSkuNum();
+            BigDecimal skuPrice = orderItem.getSkuPrice();
+            totalAmount = totalAmount.add(skuPrice.multiply(new BigDecimal(skuNum)));
+        }
+        orderInfo.setTotalAmount(totalAmount);
+        orderInfo.setOriginalTotalAmount(totalAmount);
+        //远程调用用户微服务获取用户地址
+        R<UserAddress> userAddress = remoteUserAddressService.getUserAddress(userAddressId, SecurityConstants.INNER);
+        if (R.FAIL == userAddress.getCode())
+            throw new ServiceException(userAddress.getMsg());
+
+        UserAddress address = userAddress.getData();
+
+        orderInfo.setReceiverName(address.getName());
+        orderInfo.setReceiverPhone(address.getPhone());
+        orderInfo.setReceiverTagName(address.getTagName());
+        orderInfo.setReceiverProvince(address.getProvinceCode());
+        orderInfo.setReceiverCity(address.getCityCode());
+        orderInfo.setReceiverDistrict(address.getDistrictCode());
+        orderInfo.setReceiverAddress(address.getFullAddress());
+
+        orderInfoMapper.insert(orderInfo);
+
+        //获取订单id
+        Long orderId = orderInfo.getId();
+        //为订单项设置id
+        for (OrderItem orderItem : orderItemList) {
+            orderItem.setOrderId(orderId);
+            orderItem.setRemark(remark);
+        }
+        orderItemService.saveBatch(orderItemList);
+        //插入订单日志
+        OrderLog orderLog = new OrderLog();
+        orderLog.setOrderId(orderId);
+        orderLog.setOperateUser("用户");
+        orderLog.setCreateBy(SecurityContextHolder.getUserName());
+        orderLog.setProcessStatus(orderInfo.getOrderStatus());
+        orderLog.setNote("创建订单");
+        orderLog.setRemark(remark);
+        orderLogMapper.insert(orderLog);
+
+        return orderId;
     }
 
 }
