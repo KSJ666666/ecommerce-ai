@@ -59,6 +59,19 @@ public interface RemoteProductService {
     @GetMapping(value = "/product/getSkuStock/{skuId}")
     public R<SkuStockVo> getSkuStock(@PathVariable("skuId") Long skuId, @RequestHeader(SecurityConstants.FROM_SOURCE) String source);
 
+    /**
+     * 校验库存并锁定库存
+     *
+     * @param skuId
+     * @param skuNum
+     * @param source
+     * @return data为空字符串表示库存充足且锁定成功，非空表示库存不足的原因
+     */
+    @GetMapping(value = "/product/checkStockAndSubStock/{skuId}/{skuNum}")
+    public R<String> checkStockAndSubStock(@PathVariable("skuId") Long skuId,
+                                           @PathVariable("skuNum") Integer skuNum,
+                                           @RequestHeader(SecurityConstants.FROM_SOURCE) String source);
+
 
     /**
      * 批量获取商品sku最新价格信

@@ -356,6 +356,24 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         return skuStockVo;
     }
 
+    /**
+     * 校验库存并锁定库存，返回空字符串表示成功，非空表示库存不足的原因
+     */
+    @Override
+    public String checkAndSubStock(Long skuId, Integer skuNum) {
+        //加行锁查询库存是否充足，查不到说明可用库存不够
+        SkuStock skuStock = skuStockMapper.check(skuId, skuNum);
+        if (skuStock == null) {
+            ProductSku productSku = productSkuMapper.selectById(skuId);
+            SkuStock stock = skuStockMapper.selectOne(new LambdaQueryWrapper<SkuStock>().eq(SkuStock::getSkuId, skuId));
+            int availableNum = stock == null || stock.getAvailableNum() == null ? 0 : stock.getAvailableNum();
+            return productSku.getSkuName() + "库存不足，库存只有" + availableNum + "个，您购买的数量是" + skuNum + "个";
+        }
+        //锁定库存：可用库存减少，锁定库存增加，支付成功后再真正扣减
+        skuStockMapper.lock(skuId, skuNum);
+        return "";
+    }
+
 
     // select * from product_sku where id in (1,2,3)
     // select id,sale_price,market_price from product_sku where id in (1,2,3)

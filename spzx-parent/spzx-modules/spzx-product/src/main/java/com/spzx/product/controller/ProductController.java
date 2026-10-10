@@ -188,4 +188,12 @@ public class ProductController extends BaseController {
     }
     //----详情 end------------------------------
 
+    @Operation(summary = "供微服务内部远程调用：校验并锁定库存")
+    @InnerAuth
+    @GetMapping("/checkStockAndSubStock/{skuId}/{skuNum}")
+    public R<String> checkStockAndSubStock(@PathVariable Long skuId, @PathVariable Integer skuNum) {
+        String msg = productService.checkAndSubStock(skuId, skuNum);
+        return R.ok(msg);
+    }
+
 }

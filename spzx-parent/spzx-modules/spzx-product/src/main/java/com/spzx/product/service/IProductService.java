@@ -97,5 +97,13 @@ public interface IProductService extends IService<Product> {
     SkuStockVo getSkuStock(Long skuId);
     //----详情 end------------------------------
 
+    /**
+     * 校验库存并锁定库存
+     * @param skuId
+     * @param skuNum
+     * @return 空字符串表示库存充足且锁定成功，非空表示库存不足的原因
+     */
+    String checkAndSubStock(Long skuId, Integer skuNum);
+
     public List<SkuPrice> getSkuPriceList(List<Long> skuIdList);
 }

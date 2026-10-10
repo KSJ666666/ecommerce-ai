@@ -2,7 +2,6 @@ package com.spzx.order.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.mysql.cj.x.protobuf.MysqlxCrud;
 import com.spzx.cart.api.RemoteCartService;
 import com.spzx.cart.api.domain.CartInfo;
 import com.spzx.common.core.constant.SecurityConstants;
@@ -38,7 +37,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-@Transactional
+
 @Service
 public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo> implements IOrderInfoService {
     @Autowired
@@ -170,6 +169,7 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Long submit(OrderForm orderForm) {
         //1.防止订单重复提交
         String tradeNo = orderForm.getTradeNo();
@@ -181,8 +181,7 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         String remark = orderForm.getRemark();
         BigDecimal feightFee = orderForm.getFeightFee();
         Long userAddressId = orderForm.getUserAddressId();
-        //2.添加订单项
-        //2.1插入订单
+        //3.组装订单基本信息
         OrderInfo orderInfo = new OrderInfo();
         List<OrderItem> orderItemList = orderForm.getOrderItemList();
         orderInfo.setOrderItemList(orderItemList);
@@ -200,12 +199,43 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         orderInfo.setFeightFee(feightFee);
 
         orderInfo.setRemark(remark);
-        //设置价格
+        //2.校验订单项：查询商品实时价格、校验库存，并计算订单总金额
+        StringBuffer sb = new StringBuffer();
         BigDecimal totalAmount = new BigDecimal(0);
         for (OrderItem orderItem : orderItemList) {
+            Long skuId = orderItem.getSkuId();
             Integer skuNum = orderItem.getSkuNum();
             BigDecimal skuPrice = orderItem.getSkuPrice();
+
+            //2.1查询商品实时价格，前端传来的价格不可信，必须以后端查到的实时价为准
+            R<ProductSku> productSkuR = remoteProductService.getProductSku(skuId, SecurityConstants.INNER);
+            if (R.FAIL == productSkuR.getCode()) {
+                throw new ServiceException(productSkuR.getMsg());
+            }
+            BigDecimal salePrice = productSkuR.getData().getSalePrice();
+            //实时价与结算页展示的价格不一致时，提示用户回到结算页重新下单，避免看到的价和实际扣款不一致
+            BigDecimal diff = salePrice.subtract(skuPrice);
+            if (diff.compareTo(BigDecimal.ZERO) > 0) {
+                sb.append(orderItem.getSkuName()).append("涨价").append(diff).append("元，请去结算页面重新下单；");
+            } else if (diff.compareTo(BigDecimal.ZERO) < 0) {
+                sb.append(orderItem.getSkuName()).append("降价").append(diff.abs()).append("元，请去结算页面重新下单；");
+            }
+
+            //2.2校验库存并锁定库存，返回非空说明库存不足
+            R<String> stockR = remoteProductService.checkStockAndSubStock(skuId, skuNum, SecurityConstants.INNER);
+            if (R.FAIL == stockR.getCode()) {
+                throw new ServiceException(stockR.getMsg());
+            }
+            if (stockR.getData() != null && !stockR.getData().isEmpty()) {
+                throw new ServiceException(stockR.getData());
+            }
+
+            //2.3累加金额小计
             totalAmount = totalAmount.add(skuPrice.multiply(new BigDecimal(skuNum)));
+        }
+        //价格发生变动，中断下单
+        if (sb.length() > 0) {
+            throw new ServiceException(sb.toString());
         }
         orderInfo.setTotalAmount(totalAmount);
         orderInfo.setOriginalTotalAmount(totalAmount);
@@ -224,17 +254,18 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         orderInfo.setReceiverDistrict(address.getDistrictCode());
         orderInfo.setReceiverAddress(address.getFullAddress());
 
+        //4.插入订单
         orderInfoMapper.insert(orderInfo);
 
         //获取订单id
         Long orderId = orderInfo.getId();
-        //为订单项设置id
+        //5.为订单项设置订单id后批量插入订单项
         for (OrderItem orderItem : orderItemList) {
             orderItem.setOrderId(orderId);
             orderItem.setRemark(remark);
         }
         orderItemService.saveBatch(orderItemList);
-        //插入订单日志
+        //6.插入订单日志
         OrderLog orderLog = new OrderLog();
         orderLog.setOrderId(orderId);
         orderLog.setOperateUser("用户");
@@ -243,6 +274,9 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         orderLog.setNote("创建订单");
         orderLog.setRemark(remark);
         orderLogMapper.insert(orderLog);
+
+        //7.清空购物车中已选中的购物项，避免下单后还能重复购买
+        remoteCartService.clearCheckedCartInfo(SecurityConstants.INNER);
 
         return orderId;
     }
