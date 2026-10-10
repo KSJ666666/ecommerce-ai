@@ -281,4 +281,13 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         return orderId;
     }
 
+    @Override
+    public void cancelOrder(Long orderId) {
+         OrderInfo orderInfo = new OrderInfo();
+         orderInfo.setOrderStatus(-1);
+         orderInfo.setId(orderId);
+         baseMapper.updateById(orderInfo);
+
+    }
+
 }

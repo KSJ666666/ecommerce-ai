@@ -1,9 +1,6 @@
 package com.spzx.order.controller;
 
-import com.github.pagehelper.PageHelper;
-import com.spzx.cart.api.RemoteCartService;
-import com.spzx.cart.api.domain.CartInfo;
-import com.spzx.common.core.domain.R;
+
 import com.spzx.common.core.utils.poi.ExcelUtil;
 import com.spzx.common.core.web.controller.BaseController;
 import com.spzx.common.core.web.domain.AjaxResult;
@@ -71,35 +68,36 @@ public class OrderInfoController extends BaseController {
 
     @Operation(summary = "获取去结算详情页")
     @GetMapping("/trade")
-    public AjaxResult trade(){
+    public AjaxResult trade() {
         TradeVo tradeVo = orderInfoService.trade();
         return success(tradeVo);
     }
 
     @Operation(summary = "立即购买按钮")
     @GetMapping("/buy/{skuId}")
-    public AjaxResult buy(@PathVariable Long skuId){
+    public AjaxResult buy(@PathVariable Long skuId) {
         TradeVo tradeVo = orderInfoService.buy(skuId);
         return success(tradeVo);
     }
 
     @Operation(summary = "提交订单")
     @PostMapping("/submitOrder")
-    public AjaxResult submit(@RequestBody OrderForm orderForm){
+    public AjaxResult submit(@RequestBody OrderForm orderForm) {
         Long orderId = orderInfoService.submit(orderForm);
         return success(orderId);
     }
+
     @Operation(summary = "根据订单id获取订单信息")
     @GetMapping("/getOrderInfo/{orderId}")
-    public AjaxResult getOrderInfo(@PathVariable Long orderId){
-        //getInfo方法返回的已经是AjaxResult，不能再包一层success，否则响应体会多嵌套一层导致前端取不到数据
-        return getInfo(orderId);
+    public AjaxResult getOrderInfo(@PathVariable Long orderId) {
+
+        return success(orderInfoService.selectOrderInfoById(orderId));
     }
 
-
-
-
-
-
-
+    @Operation(summary = "取消订单")
+    @GetMapping("/cancelOrder/{orderId}")
+    public AjaxResult cancelOrder(@PathVariable Long orderId){
+        orderInfoService.cancelOrder(orderId);
+        return success();
+    }
 }

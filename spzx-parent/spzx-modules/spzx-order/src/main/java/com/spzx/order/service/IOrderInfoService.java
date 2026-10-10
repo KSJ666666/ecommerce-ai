@@ -29,4 +29,6 @@ public interface IOrderInfoService extends IService<OrderInfo> {
     TradeVo buy(Long skuId);
 
     Long submit(OrderForm orderForm);
+
+    void cancelOrder(Long orderId);
 }
