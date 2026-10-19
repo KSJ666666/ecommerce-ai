@@ -29,25 +29,26 @@ public class OrderReceiver {
             exchange = @Exchange(
                     value = MqConst.EXCHANGE_CANCEL_ORDER,
                     type = "x-delayed-message",
-                    arguments = @Argument(name = "x-delayed-type",value = "direct")
+                    arguments = @Argument(name = "x-delayed-type", value = "direct")
             ),
             key = MqConst.ROUTING_CANCEL_ORDER
 
     ))
     /**
-     * version1.0
-     * 接收订单取消消息,消息队列中存放orderId，表示订单ID
+     * version2.0
      */
-    public void receiverMessage(Message message,Channel channel) {
+
+    public void receiverMessage(Long orderId, Message message, Channel channel) {
         Long deliveryTag = message.getMessageProperties().getDeliveryTag();
         try {
-            String orderId = new String(message.getBody());
+            // String orderId = new String(message.getBody());
 
-            orderInfoService.update(new LambdaUpdateWrapper<OrderInfo>()
-                            .eq(OrderInfo::getId, orderId)
-                            .eq(OrderInfo::getOrderStatus, 0)
-                            .set(OrderInfo::getOrderStatus, -1)
-            );
+//            orderInfoService.update(new LambdaUpdateWrapper<OrderInfo>()
+//                            .eq(OrderInfo::getId, orderId)
+//                            .eq(OrderInfo::getOrderStatus, 0)
+//                            .set(OrderInfo::getOrderStatus, -1)
+//            );
+            orderInfoService.cancelOrder(orderId, 2);
             channel.basicAck(deliveryTag, false);
         } catch (IOException e) {
             e.printStackTrace();
@@ -62,5 +63,32 @@ public class OrderReceiver {
         }
 
     }
+    /**
+     * version1.0
+     * 接收订单取消消息,消息队列中存放orderId，表示订单ID
+     */
+//    public void receiverMessage(Message message,Channel channel) {
+//        Long deliveryTag = message.getMessageProperties().getDeliveryTag();
+//        try {
+//            String orderId = new String(message.getBody());
+//
+//            orderInfoService.update(new LambdaUpdateWrapper<OrderInfo>()
+//                    .eq(OrderInfo::getId, orderId)
+//                    .eq(OrderInfo::getOrderStatus, 0)
+//                    .set(OrderInfo::getOrderStatus, -1)
+//            );
+//            channel.basicAck(deliveryTag, false);
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//
+//            //签收失败：requeue=true 重新放回队列（会再次投递）
+//
+//            try {
+//                channel.basicNack(deliveryTag, false, true);
+//            } catch (IOException ex) {
+//                throw new RuntimeException(ex);
+//            }
+//        }
 
 }
+

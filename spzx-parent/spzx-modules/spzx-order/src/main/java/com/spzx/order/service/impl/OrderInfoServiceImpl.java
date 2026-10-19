@@ -31,9 +31,11 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -153,6 +155,8 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         orderItem.setCreateTime(null);
         orderItem.setUpdateTime(null);
 
+        //skuId是引用商品sku的业务外键，不能置空，否则提交订单时远程查询商品sku会因路径变量为空而404
+        orderItem.setSkuId(skuId);
 
         orderItem.setSkuNum(1);
         orderItem.setSkuPrice(productSku.getSalePrice());
@@ -207,6 +211,10 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
             Long skuId = orderItem.getSkuId();
             Integer skuNum = orderItem.getSkuNum();
             BigDecimal skuPrice = orderItem.getSkuPrice();
+            //订单项缺少sku信息时直接失败，避免把null拼进远程调用url导致404难以排查
+            if (null == skuId || null == skuNum || null == skuPrice) {
+                throw new ServiceException("订单信息不完整，请去结算页面重新下单");
+            }
 
             //2.1查询商品实时价格，前端传来的价格不可信，必须以后端查到的实时价为准
             R<ProductSku> productSkuR = remoteProductService.getProductSku(skuId, SecurityConstants.INNER);
@@ -286,12 +294,40 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
     }
 
     @Override
-    public void cancelOrder(Long orderId) {
+    public void cancelOrder(Long orderId,Integer flag ) {
          OrderInfo orderInfo = new OrderInfo();
          orderInfo.setOrderStatus(-1);
          orderInfo.setId(orderId);
+         orderInfo.setCancelTime(new Date());
+         String cancelReason = flag == 1?"用户取消订单":"系统取消订单";
+         orderInfo.setCancelReason(cancelReason);
          baseMapper.updateById(orderInfo);
+         //插入订单日志
+        OrderLog orderLog = new OrderLog();
+        orderLog.setOrderId(orderId);
+        orderLog.setOperateUser(flag == 1?"用户":"系统");
+        orderLog.setCreateBy(SecurityContextHolder.getUserName());
+        orderLog.setProcessStatus(-1);
+        orderLog.setNote(flag == 1?"用户取消订单":"系统取消订单");
+        orderLog.setUpdateBy(flag == 1?SecurityContextHolder.getUserName(): "系统");
+        orderLogMapper.insert(orderLog);
 
+    }
+
+    @Override
+    public List<OrderInfo> getMyOrderInfoList(String orderStatus) {
+        Long userId = SecurityContextHolder.getUserId();
+        LambdaQueryWrapper<OrderInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(OrderInfo::getUserId, userId)
+                .eq(StringUtils.hasLength(orderStatus), OrderInfo::getOrderStatus, orderStatus);
+        List<OrderInfo> orderInfoList = baseMapper.selectList(wrapper);
+// 给每个订单塞订单项
+        orderInfoList.forEach(orderInfo -> {
+            List<OrderItem> items = orderItemMapper.selectList(
+                    new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderInfo.getId()));
+            orderInfo.setOrderItemList(items);
+        });
+        return orderInfoList;
     }
 
 }

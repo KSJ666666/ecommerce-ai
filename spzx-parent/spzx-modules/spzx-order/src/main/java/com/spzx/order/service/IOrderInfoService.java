@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.spzx.order.api.domain.OrderInfo;
 import com.spzx.order.domain.vo.OrderForm;
 import com.spzx.order.domain.vo.TradeVo;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 
 import java.util.List;
 
@@ -30,5 +31,7 @@ public interface IOrderInfoService extends IService<OrderInfo> {
 
     Long submit(OrderForm orderForm);
 
-    void cancelOrder(Long orderId);
+    void cancelOrder(Long orderId,Integer flag);
+
+    List<OrderInfo> getMyOrderInfoList(String orderStatus);
 }

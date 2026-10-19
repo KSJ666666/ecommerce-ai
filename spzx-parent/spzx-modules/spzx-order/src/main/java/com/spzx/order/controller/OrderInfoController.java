@@ -1,6 +1,7 @@
 package com.spzx.order.controller;
 
 
+import com.github.pagehelper.PageHelper;
 import com.spzx.common.core.utils.poi.ExcelUtil;
 import com.spzx.common.core.web.controller.BaseController;
 import com.spzx.common.core.web.domain.AjaxResult;
@@ -97,7 +98,14 @@ public class OrderInfoController extends BaseController {
     @Operation(summary = "取消订单")
     @GetMapping("/cancelOrder/{orderId}")
     public AjaxResult cancelOrder(@PathVariable Long orderId){
-        orderInfoService.cancelOrder(orderId);
+        orderInfoService.cancelOrder(orderId,1);
         return success();
+    }
+    @Operation(summary = "查询订单列表")
+    @GetMapping("/userOrderInfoList/{pageNum}/{pageSize}")
+    public TableDataInfo userOrderInfoList(@PathVariable Integer pageNum, @PathVariable Integer pageSize,String orderStatus) {
+        PageHelper.startPage(pageNum, pageSize);
+        List<OrderInfo> list = orderInfoService.getMyOrderInfoList(orderStatus);
+        return getDataTable(list);
     }
 }
