@@ -8,6 +8,7 @@ import com.spzx.common.core.constant.SecurityConstants;
 import com.spzx.common.core.context.SecurityContextHolder;
 import com.spzx.common.core.domain.R;
 import com.spzx.common.core.exception.ServiceException;
+import com.spzx.common.rabbit.constant.MqConst;
 import com.spzx.common.rabbit.service.RabbitService;
 import com.spzx.order.api.domain.OrderInfo;
 import com.spzx.order.api.domain.OrderItem;
@@ -277,6 +278,9 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
 
         //7.清空购物车中已选中的购物项，避免下单后还能重复购买
         remoteCartService.clearCheckedCartInfo(SecurityConstants.INNER);
+
+        //TODO 发送一条延迟消息，30分钟未支付取消订单
+        rabbitService.sendDelayedMessage(MqConst.EXCHANGE_CANCEL_ORDER,MqConst.ROUTING_CANCEL_ORDER,String.valueOf(orderId));
 
         return orderId;
     }

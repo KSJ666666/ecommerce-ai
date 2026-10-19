@@ -41,7 +41,7 @@ public class SpzxProductApplication implements CommandLineRunner {
         //获取商品sku列表
         List<ProductSku> productSkuList = productSkuMapper.selectList(null);
         //获取商品skuid
-        List<Long> productSkuIds = productSkuList.stream().map(ProductSku::getProductId).collect(Collectors.toList());
+        List<Long> productSkuIds = productSkuList.stream().map(ProductSku::getId).collect(Collectors.toList());
         productSkuIds.forEach(skuId->{
             //将sku注入redis位图中
             redisTemplate.opsForValue().setBit("product:productSku:data",skuId,true);
