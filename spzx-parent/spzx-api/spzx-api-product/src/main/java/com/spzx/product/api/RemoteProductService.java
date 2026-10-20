@@ -72,6 +72,19 @@ public interface RemoteProductService {
                                            @PathVariable("skuNum") Integer skuNum,
                                            @RequestHeader(SecurityConstants.FROM_SOURCE) String source);
 
+    /**
+     * 解锁库存，与checkStockAndSubStock互为反向操作，取消订单/支付超时时使用
+     *
+     * @param skuId
+     * @param skuNum
+     * @param source
+     * @return data为空字符串表示解锁成功，非空表示失败原因
+     */
+    @GetMapping(value = "/product/unlockStock/{skuId}/{skuNum}")
+    public R<String> unlockStock(@PathVariable("skuId") Long skuId,
+                                 @PathVariable("skuNum") Integer skuNum,
+                                 @RequestHeader(SecurityConstants.FROM_SOURCE) String source);
+
 
     /**
      * 批量获取商品sku最新价格信

@@ -374,6 +374,27 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         return "";
     }
 
+    /**
+     * 解锁库存：锁定库存减少，可用库存增加，与checkAndSubStock互为反向操作
+     */
+    @Override
+    public String unlockStock(Long skuId, Integer skuNum) {
+        if (skuId == null || skuNum == null || skuNum <= 0) {
+            return "解锁库存失败：参数不合法";
+        }
+        SkuStock skuStock = skuStockMapper.selectOne(new LambdaQueryWrapper<SkuStock>().eq(SkuStock::getSkuId, skuId));
+        if (skuStock == null) {
+            return "解锁库存失败：商品库存记录不存在";
+        }
+        int lockNum = skuStock.getLockNum() == null ? 0 : skuStock.getLockNum();
+        //防止超量解锁，最多只能把锁定的数量解锁回去
+        int realNum = Math.min(lockNum, skuNum);
+        if (realNum > 0) {
+            skuStockMapper.unlock(skuId, realNum);
+        }
+        return "";
+    }
+
 
     // select * from product_sku where id in (1,2,3)
     // select id,sale_price,market_price from product_sku where id in (1,2,3)

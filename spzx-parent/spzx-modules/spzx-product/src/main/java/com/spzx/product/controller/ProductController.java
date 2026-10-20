@@ -196,4 +196,12 @@ public class ProductController extends BaseController {
         return R.ok(msg);
     }
 
+    @Operation(summary = "供微服务内部远程调用：解锁库存")
+    @InnerAuth
+    @GetMapping("/unlockStock/{skuId}/{skuNum}")
+    public R<String> unlockStock(@PathVariable Long skuId, @PathVariable Integer skuNum) {
+        String msg = productService.unlockStock(skuId, skuNum);
+        return R.ok(msg);
+    }
+
 }

@@ -105,5 +105,14 @@ public interface IProductService extends IService<Product> {
      */
     String checkAndSubStock(Long skuId, Integer skuNum);
 
+    /**
+     * 解锁库存（取消订单/支付超时时把锁定的库存还回去）
+     *
+     * @param skuId
+     * @param skuNum
+     * @return 空字符串表示解锁成功，非空表示失败原因
+     */
+    String unlockStock(Long skuId, Integer skuNum);
+
     public List<SkuPrice> getSkuPriceList(List<Long> skuIdList);
 }

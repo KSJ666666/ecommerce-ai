@@ -1,6 +1,7 @@
 package com.spzx.order.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.spzx.cart.api.RemoteCartService;
 import com.spzx.cart.api.domain.CartInfo;
@@ -30,6 +31,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
@@ -90,6 +93,9 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
     @Override
     public OrderInfo selectOrderInfoById(Long id) {
         OrderInfo orderInfo = orderInfoMapper.selectById(id);
+        if (orderInfo == null) {
+            throw new ServiceException("订单不存在");
+        }
         List<OrderItem> orderItemList = orderItemMapper.selectList(new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, id));
         orderInfo.setOrderItemList(orderItemList);
         return orderInfo;
@@ -98,7 +104,6 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
     @Override
     public TradeVo trade() {
         TradeVo tradeVo = new TradeVo();
-
 
 
         //结算商品列表
@@ -124,7 +129,7 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
             String tradeNo = UUID.randomUUID().toString().replace("-", "");
             tradeVo.setTradeNo(tradeNo);
 
-            redisTemplate.opsForValue().set("user:trade:" + tradeNo, tradeNo,5, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set("user:trade:" + tradeNo, tradeNo, 5, TimeUnit.MINUTES);
             //计算总的需要支付的价钱
             BigDecimal bigDecimal = new BigDecimal(0);
             for (OrderItem orderItem : orderItemList) {
@@ -168,7 +173,7 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         String tradeNo = UUID.randomUUID().toString().replace("-", "");
 
         tradeVo.setTradeNo(tradeNo);
-        redisTemplate.opsForValue().set("user:trade:" + tradeNo, tradeNo,5, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set("user:trade:" + tradeNo, tradeNo, 5, TimeUnit.MINUTES);
 
         return tradeVo;
     }
@@ -287,31 +292,68 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         //7.清空购物车中已选中的购物项，避免下单后还能重复购买
         remoteCartService.clearCheckedCartInfo(SecurityConstants.INNER);
 
-        //TODO 发送一条延迟消息，30分钟未支付取消订单
-        rabbitService.sendDelayedMessage(MqConst.EXCHANGE_CANCEL_ORDER,MqConst.ROUTING_CANCEL_ORDER,String.valueOf(orderId));
+        //8.发送延迟消息，30分钟未支付自动取消订单
+        //必须等事务提交成功后再发，否则订单回滚了但消息已经发出去，消费者会查到一个不存在的订单
+        String orderIdStr = String.valueOf(orderId);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                rabbitService.sendDelayedMessage(MqConst.EXCHANGE_CANCEL_ORDER, MqConst.ROUTING_CANCEL_ORDER, orderIdStr);
+            }
+        });
 
         return orderId;
     }
 
     @Override
-    public void cancelOrder(Long orderId,Integer flag ) {
-         OrderInfo orderInfo = new OrderInfo();
-         orderInfo.setOrderStatus(-1);
-         orderInfo.setId(orderId);
-         orderInfo.setCancelTime(new Date());
-         String cancelReason = flag == 1?"用户取消订单":"系统取消订单";
-         orderInfo.setCancelReason(cancelReason);
-         baseMapper.updateById(orderInfo);
-         //插入订单日志
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelOrder(Long orderId, Integer flag) {
+        OrderInfo orderInfo = new OrderInfo();
+        orderInfo.setOrderStatus(-1);
+        orderInfo.setId(orderId);
+        orderInfo.setCancelTime(new Date());
+
+        LambdaUpdateWrapper<OrderInfo> updateWrapper = new LambdaUpdateWrapper<OrderInfo>()
+                .eq(OrderInfo::getId, orderId)
+                .eq(OrderInfo::getOrderStatus, 0);
+        //flag=1是用户主动取消，需要校验订单归属，防止取消别人的订单；
+        //flag=2是系统自动取消（消息队列调用），没有用户上下文，不能加userId条件
+        if (flag != null && flag == 1) {
+            updateWrapper.eq(OrderInfo::getUserId, SecurityContextHolder.getUserId());
+        }
+        int update = orderInfoMapper.update(orderInfo, updateWrapper);
+        if (update == 0) {
+            //订单不存在、已取消或不是待支付状态，直接返回即可。
+            //这里必须是幂等的：延迟消息到期时会再次调用本方法，抛异常会导致消息反复重试
+            return;
+        }
+        String cancelReason = flag == 1 ? "用户取消订单" : "系统取消订单";
+        orderInfo.setCancelReason(cancelReason);
+        baseMapper.updateById(orderInfo);
+
+        //回流库存：下单时锁定的库存要解锁回去，否则库存会越来越少
+        List<OrderItem> orderItemList = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
+        for (OrderItem orderItem : orderItemList) {
+            R<String> unlockR = remoteProductService.unlockStock(
+                    orderItem.getSkuId(), orderItem.getSkuNum(), SecurityConstants.INNER);
+            if (R.FAIL == unlockR.getCode()) {
+                throw new ServiceException(unlockR.getMsg());
+            }
+            if (unlockR.getData() != null && !unlockR.getData().isEmpty()) {
+                throw new ServiceException(unlockR.getData());
+            }
+        }
+
+        //插入订单日志
         OrderLog orderLog = new OrderLog();
         orderLog.setOrderId(orderId);
-        orderLog.setOperateUser(flag == 1?"用户":"系统");
-        orderLog.setCreateBy(SecurityContextHolder.getUserName());
+        orderLog.setOperateUser(flag == 1 ? "用户" : "系统");
+        orderLog.setCreateBy(flag == 1 ? SecurityContextHolder.getUserName() : "系统");
         orderLog.setProcessStatus(-1);
-        orderLog.setNote(flag == 1?"用户取消订单":"系统取消订单");
-        orderLog.setUpdateBy(flag == 1?SecurityContextHolder.getUserName(): "系统");
+        orderLog.setNote(flag == 1 ? "用户取消订单" : "系统取消订单");
+        orderLog.setUpdateBy(flag == 1 ? SecurityContextHolder.getUserName() : "系统");
         orderLogMapper.insert(orderLog);
-
     }
 
     @Override

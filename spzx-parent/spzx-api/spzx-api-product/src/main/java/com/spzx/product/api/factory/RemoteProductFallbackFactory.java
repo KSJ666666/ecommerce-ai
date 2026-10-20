@@ -77,6 +77,11 @@ public class RemoteProductFallbackFactory implements FallbackFactory<RemoteProdu
                 return R.fail("校验并锁定库存失败:" + throwable.getMessage());
             }
 
+            @Override
+            public R<String> unlockStock(Long skuId, Integer skuNum, String source) {
+                return R.fail("解锁库存失败:" + throwable.getMessage());
+            }
+
 
             @Override
             public R<List<SkuPrice>> getSkuPriceList(List<Long> skuIdList, String source) {
