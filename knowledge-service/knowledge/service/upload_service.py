@@ -9,8 +9,8 @@ from datetime import datetime
 from fastapi import UploadFile
 
 from knowledge.core.paths import get_local_base_dir
-from knowledge.processor.improt_processor.exceptions import FileProcessingError
-from knowledge.processor.improt_processor.main_graph import import_app
+from knowledge.processor.import_processor.exceptions import FileProcessingError
+from knowledge.processor.import_processor.main_graph import import_app
 from knowledge.utils.client.storage_clients import StorageClients
 from knowledge.utils.task_util import add_running_task, add_done_task, add_node_duration, update_task_status, \
     TASK_STATUS_PROCESSING, TASK_STATUS_COMPLETED, TASK_STATUS_FAILED

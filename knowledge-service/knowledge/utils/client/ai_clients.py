@@ -4,6 +4,7 @@ from typing import Optional
 from langchain_openai import ChatOpenAI
 from openai import OpenAI
 from dotenv import load_dotenv
+from FlagEmbedding import FlagReranker
 from pymilvus.model.hybrid import BGEM3EmbeddingFunction
 
 from knowledge.utils.client.base import BaseClientManager, logger
@@ -24,6 +25,10 @@ class AIClients(BaseClientManager):
 
     _bge_m3_client: Optional[BGEM3EmbeddingFunction] = None
     _bge_m3_lock = threading.Lock()
+
+    # ── BGE-M3 重排序模型（reranker_node 用）──
+    _bge_m3_rerank_client: Optional[FlagReranker] = None
+    _bge_m3_rerank_lock = threading.Lock()
 
 
     @classmethod
@@ -47,8 +52,15 @@ class AIClients(BaseClientManager):
             raise ConnectionError(f"OpenAI 连接失败: {e}") from e
 
     @classmethod
-    def get_openai_llm_client(cls,response_format:bool = True) -> ChatOpenAI:
-        return cls._get_or_create("_openai_llm_client", cls._openai_llm_lock, lambda : cls._create_openai_llm_client(response_format))
+    def get_openai_llm_client(cls, response_format: bool = True) -> ChatOpenAI:
+        # 缓存 key 必须区分 response_format：这是两个不同的客户端实例。
+        # 共用一个 key 时，先创建的那个会被后面所有调用复用——
+        # 比如商品名识别先建了 json_object 客户端，后面的 HyDE 节点本想要纯文本，
+        # 拿到的却还是 json_object，而它的 prompt 里没有 "json" 字样，
+        # DashScope 会直接返回 400: 'messages' must contain the word 'json'。
+        key = "_openai_llm_client_json" if response_format else "_openai_llm_client_plain"
+        return cls._get_or_create(key, cls._openai_llm_lock,
+                                  lambda: cls._create_openai_llm_client(response_format))
 
     @classmethod
     def _create_openai_llm_client(cls,response_format:bool = True) -> ChatOpenAI:
@@ -111,6 +123,45 @@ class AIClients(BaseClientManager):
 
         except Exception as e:
             raise ConnectionError(f"BGE_M3嵌入模型客户端创建失败: {e}") from e
+
+    # ── BGE-M3 重排序模型客户端 ──
+    @classmethod
+    def get_bge_m3_rerank_client(cls) -> FlagReranker:
+        return cls._get_or_create("_bge_m3_rerank_client",
+                                  cls._bge_m3_rerank_lock,
+                                  cls._create_bge_m3_rerank_client)
+
+    @classmethod
+    def _create_bge_m3_rerank_client(cls) -> FlagReranker:
+        """创建 BGE-Reranker 客户端（reranker_node 精排用）。"""
+        try:
+            model_name_or_path = cls._require_env('BGE_RERANKER_LARGE')
+            device = cls._require_env('BGE_DEVICE')
+            fp16_str = cls._require_env('BGE_FP16')
+            fp16 = fp16_str.lower() in ("true", "1")
+
+            reranker = FlagReranker(
+                model_name_or_path=model_name_or_path,
+                device=device,
+                use_fp16=fp16
+            )
+            return reranker
+        except EnvironmentError as e:
+            raise
+        except Exception as e:
+            raise ConnectionError(f"BGE-M3重排序模型客户端创建失败: {e}") from e
+
+    # ── 兼容别名 ──────────────────────────────────────
+    # 节点代码里同时存在新旧两套方法名，统一在这里转发，避免逐个文件去改。
+    @classmethod
+    def get_llm_client(cls, response_format: bool = True) -> ChatOpenAI:
+        """旧名，等同 get_openai_llm_client。"""
+        return cls.get_openai_llm_client(response_format)
+
+    @classmethod
+    def get_openai(cls) -> OpenAI:
+        """旧名，等同 get_openai_vlm_client。"""
+        return cls.get_openai_vlm_client()
 
 
 

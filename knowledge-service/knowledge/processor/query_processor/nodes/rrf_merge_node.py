@@ -30,6 +30,14 @@ class RrfMergeNode(BaseNode):
                             ,self.config.rrf_max_results)
 
         state["rrf_chunks"] = merge_rrf_result
+        # 观测点：三路各自条数 + 融合后条数，融合为空时能立刻看出是哪一路断了
+        self.logger.info(
+            "[RRF] 向量=%s HyDE=%s 融合后=%s 首条字段=%s",
+            len(search_result_weight["embedding_search_chunks"][0]),
+            len(search_result_weight["hyde_embedding_chunks"][0]),
+            len(merge_rrf_result),
+            list(merge_rrf_result[0][0].keys()) if merge_rrf_result else [],
+        )
         return state
 
     def _validate_search_result(self, search_result: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

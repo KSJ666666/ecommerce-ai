@@ -63,6 +63,12 @@ class HybridVectorSearch(BaseNode):
 
                                                             )
         #6检索校验
+            # 观测点：过滤条件和命中条数，检索为空时很容易静默失败，加日志便于定位
+            self.logger.info(
+                "[混合检索] expr=%s params=%s 命中=%s",
+                expr, expr_params,
+                len(hybrid_search_res[0]) if hybrid_search_res and hybrid_search_res[0] else 0,
+            )
             if not hybrid_search_res or not hybrid_search_res[0]:
                 return state
         #7.返回state

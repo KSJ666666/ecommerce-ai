@@ -80,10 +80,17 @@ def create_fastapi()->FastAPI:
     return app
 
 
+# query_router 里的工厂叫 create_app，为统一两个服务的启动方式，这里加个别名。
+# 两种写法都能用：--factory knowledge.api.import_router:create_app / :create_fastapi
+create_app = create_fastapi
+
+
 if __name__ == '__main__':
     """
     :param1:  fastapi 示例
     :param2:  服务ip地址
     :param3:  端口号
     """
-    uvicorn.run(app=create_fastapi(),host="0.0.0.0",port=8001  )
+    # 导入服务用 8000，查询服务用 8001。
+    # 原来这里写的是 8001，会和 query_router 撞端口导致后启动的那个起不来。
+    uvicorn.run(app=create_fastapi(), host="0.0.0.0", port=8000)

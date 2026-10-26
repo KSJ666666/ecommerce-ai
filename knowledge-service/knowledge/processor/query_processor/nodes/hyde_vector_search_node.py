@@ -5,7 +5,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from knowledge.processor.query_processor.base import BaseNode, T
 from knowledge.processor.query_processor.exceptions import StateFieldError
 from knowledge.processor.query_processor.state import QueryGraphState
-from knowledge.prompt.query_prompt import HYDE_USER_PROMPT_TEMPLATE
+from knowledge.prompts.query_prompt import HYDE_USER_PROMPT_TEMPLATE
 from knowledge.utils.client.ai_clients import AIClients
 from knowledge.utils.client.storage_clients import StorageClients
 from knowledge.utils.embedding_util import generate_bge_m3_hybrid_vectors
@@ -144,6 +144,6 @@ if __name__ == "__main__":
         print(f"      内容: {content[:80]}...")
 
 
-
-
-
+# query_processor/main_graph.py 里用的是课程版类名 HyDeVectorSearchNode，
+# 这里加个别名对齐，避免为了一个大小写去改主图。
+HyDeVectorSearchNode = HydeVectorSearch
