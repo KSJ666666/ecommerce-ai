@@ -7,6 +7,7 @@ import com.spzx.payment.domain.PaymentInfo;
  * 付款信息Service接口
  */
 public interface IPaymentInfoService extends IService<PaymentInfo> {
+    PaymentInfo addOrGetPaymentInfo(String orderNo);
 
 
 }

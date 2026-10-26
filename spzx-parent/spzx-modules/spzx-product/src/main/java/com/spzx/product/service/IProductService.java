@@ -8,6 +8,7 @@ import com.spzx.product.api.domain.vo.SkuStockVo;
 import com.spzx.product.api.domain.Product;
 import com.spzx.product.api.domain.ProductSku;
 import com.spzx.product.api.domain.ProductDetails;
+import com.spzx.product.domain.vo.AiSkuView;
 
 import java.util.List;
 import java.util.Map;
@@ -96,6 +97,14 @@ public interface IProductService extends IService<Product> {
 
     SkuStockVo getSkuStock(Long skuId);
     //----详情 end------------------------------
+
+    /**
+     * 面向 AI 客服的 SKU 视图：把 product_sku 与 sku_stock 拼成可直接播报的一屏信息
+     *
+     * @param skuId 商品 skuId
+     * @return 视图；sku 不存在时返回 null
+     */
+    AiSkuView getAiSkuView(Long skuId);
 
     /**
      * 校验库存并锁定库存

@@ -46,11 +46,11 @@ public class AlipayConfig {
     public   void setNotify_url(String notify_payment_url) {
         AlipayConfig.notify_payment_url = notify_payment_url;
     }
-
-    @Value("${alipay.return_order_url}")
-    public   void setReturn_order_url(String return_order_url) {
-        AlipayConfig.return_order_url = return_order_url;
-    }
+//
+//    @Value("${alipay.return_order_url}")
+//    public   void setReturn_order_url(String return_order_url) {
+//        AlipayConfig.return_order_url = return_order_url;
+//    }
 
     @Bean
     public AlipayClient alipayClient(){

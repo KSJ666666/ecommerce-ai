@@ -1,46 +1,91 @@
 ######################################################################
-# Build Tools
-
-.gradle
-/build/
-!gradle/wrapper/gradle-wrapper.jar
-
+# 构建产物
+######################################################################
 target/
+*/target/
+**/target/
+build/
+dist/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
 !.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+dependency-reduced-pom.xml
 
 ######################################################################
-# IDE
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-
-### IntelliJ IDEA ###
-.idea
-*.iws
+# IDE / 编辑器
+######################################################################
+.idea/
 *.iml
 *.ipr
-
-### JRebel ###
-rebel.xml
-### NetBeans ###
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+.apt_generated
+.springBeans
 nbproject/private/
-build/*
 nbbuild/
-dist/
 nbdist/
 .nb-gradle/
+rebel.xml
+*.swp
+*~
 
 ######################################################################
-# Others
-*.log
-*.xml.versionsBackup
-*.swp
+# 前端（spzx-ui）
+######################################################################
+node_modules/
+dist-ssr/
+.vite/
+.npm/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.eslintcache
+*.local
 
-!*/build/*.java
-!*/build/*.html
-!*/build/*.xml
+######################################################################
+# 运行时产物
+######################################################################
+logs/
+runtime-logs/
+*.log
+*.pid
+*.hprof
+temp/
+tmp/
+
+######################################################################
+# 敏感信息（数据库密码、密钥、本地覆盖配置）
+# 注意：数据源/支付宝密钥实际放在 Nacos 配置中心，不在仓库里
+######################################################################
+.env
+.env.*
+!.env.example
+**/application-local.yml
+**/application-local.yaml
+*.jks
+*.p12
+*.pem
+
+######################################################################
+# 其他
+######################################################################
+*.xml.versionsBackup
+.DS_Store
+Thumbs.db
+
+# 电商客服服务是独立项目，不在本仓库管理（历史里曾有一个初始化提交）
+customer-service-backend/
+ecommerce-service-backend/
+shopkeeper_brain/
+.workbuddy/

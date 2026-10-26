@@ -2,6 +2,8 @@ package com.spzx.order.controller;
 
 
 import com.github.pagehelper.PageHelper;
+import com.spzx.common.core.domain.R;
+import com.spzx.common.core.domain.R;
 import com.spzx.common.core.utils.poi.ExcelUtil;
 import com.spzx.common.core.web.controller.BaseController;
 import com.spzx.common.core.web.domain.AjaxResult;
@@ -12,6 +14,7 @@ import com.spzx.common.security.annotation.InnerAuth;
 import com.spzx.common.security.annotation.RequiresLogin;
 import com.spzx.common.security.annotation.RequiresPermissions;
 import com.spzx.order.api.domain.OrderInfo;
+import com.spzx.order.domain.vo.AiOrderView;
 import com.spzx.order.domain.vo.OrderForm;
 import com.spzx.order.domain.vo.TradeVo;
 import com.spzx.order.service.IOrderInfoService;
@@ -23,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "订单接口管理")
 @RestController
@@ -93,6 +97,35 @@ public class OrderInfoController extends BaseController {
     public AjaxResult getOrderInfo(@PathVariable Long orderId) {
 
         return success(orderInfoService.selectOrderInfoById(orderId));
+    }
+
+    @Operation(summary = "供微服务内部远程调用：根据订单号获取订单信息")
+    @InnerAuth
+    @GetMapping("/inner/getOrderInfo/{orderNo}")
+    public R<OrderInfo> getOrderInfoInner(@PathVariable String orderNo) {
+        //内部接口统一返回R，和Feign客户端声明的R<OrderInfo>保持一致，避免依赖AjaxResult的巧合结构
+        return R.ok(orderInfoService.getOrderInfoByOrderNo(orderNo));
+    }
+
+    @Operation(summary = "供微服务内部远程调用：根据订单号获取物流状态（按订单状态推导，未接入承运商）")
+    @InnerAuth
+    @GetMapping("/inner/logistics/{orderNo}")
+    public R<Map<String, Object>> getLogisticsInner(@PathVariable String orderNo) {
+        return R.ok(orderInfoService.getLogisticsByOrderNo(orderNo));
+    }
+
+    @Operation(summary = "供 AI 客服远程调用：订单聚合视图（状态文案/金额/收货信息/明细）")
+    @InnerAuth
+    @GetMapping("/inner/ai/{orderNo}")
+    public R<AiOrderView> getAiOrderView(@PathVariable String orderNo) {
+        return R.ok(orderInfoService.getAiOrderView(orderNo));
+    }
+
+    @Operation(summary = "供微服务内部远程调用：支付成功后修改订单状态")
+    @InnerAuth
+    @GetMapping("/inner/updateOrderStatus/{orderNo}/{orderStatus}")
+    public R<Boolean> updateOrderStatus(@PathVariable String orderNo, @PathVariable Integer orderStatus) {
+        return R.ok(orderInfoService.updateOrderStatus(orderNo, orderStatus));
     }
 
     @Operation(summary = "取消订单")

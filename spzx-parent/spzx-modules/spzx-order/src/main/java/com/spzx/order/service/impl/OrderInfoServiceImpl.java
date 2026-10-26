@@ -14,6 +14,7 @@ import com.spzx.common.rabbit.service.RabbitService;
 import com.spzx.order.api.domain.OrderInfo;
 import com.spzx.order.api.domain.OrderItem;
 import com.spzx.order.domain.OrderLog;
+import com.spzx.order.domain.vo.AiOrderView;
 import com.spzx.order.domain.vo.OrderForm;
 import com.spzx.order.domain.vo.TradeVo;
 import com.spzx.order.mapper.OrderInfoMapper;
@@ -37,9 +38,12 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -370,6 +374,154 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
             orderInfo.setOrderItemList(items);
         });
         return orderInfoList;
+    }
+
+
+    @Override
+    public OrderInfo getOrderInfoByOrderNo(String orderNo) {
+        OrderInfo orderInfo = orderInfoMapper.selectOne(new LambdaQueryWrapper<OrderInfo>().eq(OrderInfo::getOrderNo, orderNo));
+        //查不到要先拦住，否则下面orderInfo.getId()直接空指针，调用方只能看到一个含糊的500
+        if (orderInfo == null) {
+            throw new ServiceException("订单不存在，请确认传的是订单号orderNo而不是订单id");
+        }
+
+        List<OrderItem> orderItemList = orderItemMapper.selectList(new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderInfo.getId()));
+
+        orderInfo.setOrderItemList(orderItemList);
+
+
+        return orderInfo;
+    }
+
+    /**
+     * 支付成功后由支付微服务远程调用，把订单状态改成"待发货"
+     * @param orderNo 订单号
+     * @param orderStatus 目标状态，1表示待发货
+     * @return true=改成功了；false=订单不是待付款状态（已支付过或已被取消）
+     */
+    @Override
+    public boolean updateOrderStatus(String orderNo, Integer orderStatus) {
+        OrderInfo orderInfo = new OrderInfo();
+        orderInfo.setOrderStatus(orderStatus);
+        orderInfo.setPaymentTime(new Date());
+
+        //只改"待付款(0)"的订单，支付宝回调可能重复发，这个条件保证了重复调用只更新0行
+        LambdaUpdateWrapper<OrderInfo> updateWrapper = new LambdaUpdateWrapper<OrderInfo>()
+                .eq(OrderInfo::getOrderNo, orderNo)
+                .eq(OrderInfo::getOrderStatus, 0);
+        return orderInfoMapper.update(orderInfo, updateWrapper) > 0;
+    }
+
+    /**
+     * 物流状态按订单状态机推导：0待支付 1待发货 2待收货 3已完成 -1已取消。
+     * 未接入真实承运商，tracking_number / logistics_company 恒为 null，由调用方展示为"未知"。
+     */
+    @Override
+    public Map<String, Object> getLogisticsByOrderNo(String orderNo) {
+        OrderInfo orderInfo = orderInfoMapper.selectOne(new LambdaQueryWrapper<OrderInfo>().eq(OrderInfo::getOrderNo, orderNo));
+        Map<String, Object> logistics = new HashMap<>();
+        logistics.put("tracking_number", null);
+        logistics.put("logistics_company", null);
+        if (orderInfo == null) {
+            logistics.put("status", "NOT_FOUND");
+            logistics.put("status_desc", "当前系统中没有查到该订单。");
+            return logistics;
+        }
+        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        Integer status = orderInfo.getOrderStatus() == null ? -2 : orderInfo.getOrderStatus();
+        switch (status) {
+            case 0 -> {
+                logistics.put("status", "UNPAID");
+                logistics.put("status_desc", "订单尚未支付，未生成物流信息。");
+            }
+            case 1 -> {
+                logistics.put("status", "PENDING_SHIPMENT");
+                logistics.put("status_desc", "订单已支付，商家尚未发货。");
+            }
+            case 2 -> {
+                logistics.put("status", "IN_TRANSIT");
+                logistics.put("status_desc", orderInfo.getDeliveryTime() == null
+                        ? "包裹已发出，运输中。"
+                        : "包裹已于 " + fmt.format(orderInfo.getDeliveryTime()) + " 发出，运输中。");
+            }
+            case 3 -> {
+                logistics.put("status", "RECEIVED");
+                logistics.put("status_desc", orderInfo.getReceiveTime() == null
+                        ? "包裹已签收。"
+                        : "包裹已于 " + fmt.format(orderInfo.getReceiveTime()) + " 签收。");
+            }
+            default -> {
+                logistics.put("status", "CANCELLED");
+                logistics.put("status_desc", "订单已取消，无物流信息。");
+            }
+        }
+        return logistics;
+    }
+
+    /**
+     * 面向 AI 客服的订单视图。
+     *
+     * <p>状态文案刻意写成"可直接播报"的短句，且不带句号——客服流程模板
+     * （flow_config/user_flows.yml）会是「订单{{order_number}}当前状态是：{{order_status}}。」
+     * 自带一个句号，这里再带一个就会渲染成"备货中。。"。</p>
+     */
+    @Override
+    public AiOrderView getAiOrderView(String orderNo) {
+        OrderInfo orderInfo;
+        try {
+            orderInfo = getOrderInfoByOrderNo(orderNo);
+        } catch (ServiceException e) {
+            //订单号不存在属于正常的业务分支（用户打错一位就会走到这里），返回 null 让调用方给友好提示，
+            //不把 500 抛给客服，否则客服只能回一句"查询失败"。
+            return null;
+        }
+
+        AiOrderView view = new AiOrderView();
+        view.setOrderNo(orderInfo.getOrderNo());
+        view.setOrderStatus(orderInfo.getOrderStatus());
+        view.setStatusDesc(AI_STATUS_DESC.getOrDefault(orderInfo.getOrderStatus(), "状态未知"));
+        view.setTotalAmount(orderInfo.getTotalAmount());
+        view.setReceiverName(orderInfo.getReceiverName());
+        view.setReceiverPhoneMasked(maskPhone(orderInfo.getReceiverPhone()));
+        view.setReceiverAddress(orderInfo.getReceiverAddress());
+        if (orderInfo.getCreateTime() != null) {
+            view.setCreateTime(new SimpleDateFormat("yyyy-MM-dd HH:mm").format(orderInfo.getCreateTime()));
+        }
+
+        List<AiOrderView.Item> items = new ArrayList<>();
+        if (orderInfo.getOrderItemList() != null) {
+            for (OrderItem orderItem : orderInfo.getOrderItemList()) {
+                AiOrderView.Item item = new AiOrderView.Item();
+                item.setProductId(orderItem.getSkuId());
+                item.setTitle(orderItem.getSkuName());
+                item.setQuantity(orderItem.getSkuNum());
+                item.setPrice(orderItem.getSkuPrice());
+                items.add(item);
+            }
+        }
+        view.setItems(items);
+        return view;
+    }
+
+    /**
+     * 订单状态文案，与前端 myOrder 页面保持一致的口径。
+     */
+    private static final Map<Integer, String> AI_STATUS_DESC = Map.of(
+            0, "待付款，订单已提交但还没有完成支付",
+            1, "商家正在备货，尚未发货",
+            2, "包裹已发出，正在配送途中",
+            3, "已签收，订单完成",
+            -1, "订单已取消"
+    );
+
+    /**
+     * 手机号脱敏，避免客服把完整号码播报出去。
+     */
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 7) {
+            return phone;
+        }
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
     }
 
 }

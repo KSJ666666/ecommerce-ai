@@ -15,6 +15,7 @@ import com.spzx.product.api.domain.vo.SkuQuery;
 import com.spzx.product.api.domain.vo.SkuStockVo;
 import com.spzx.product.api.domain.Product;
 import com.spzx.product.api.domain.ProductDetails;
+import com.spzx.product.domain.vo.AiSkuView;
 import com.spzx.product.service.IProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -202,6 +203,13 @@ public class ProductController extends BaseController {
     public R<String> unlockStock(@PathVariable Long skuId, @PathVariable Integer skuNum) {
         String msg = productService.unlockStock(skuId, skuNum);
         return R.ok(msg);
+    }
+
+    @Operation(summary = "供 AI 客服远程调用：SKU 聚合视图（名称/价格/可用库存/规格）")
+    @InnerAuth
+    @GetMapping("/inner/ai/sku/{skuId}")
+    public R<AiSkuView> getAiSkuView(@PathVariable Long skuId) {
+        return R.ok(productService.getAiSkuView(skuId));
     }
 
 }

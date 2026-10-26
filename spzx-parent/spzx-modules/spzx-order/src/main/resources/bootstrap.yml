@@ -25,3 +25,16 @@ spring:
         # 共享配置
         shared-configs:
           - application-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+
+# Feign 远程调用配置
+feign:
+  # 开启熔断器，fallbackFactory降级才会生效（需要引入spring-cloud-starter-circuitbreaker-resilience4j依赖）
+  circuitbreaker:
+    enabled: true
+  client:
+    config:
+      default:
+        # 连接超时2秒、读取超时3秒，避免慢依赖拖垮本服务线程池
+        connectTimeout: 2000
+        readTimeout: 3000
+        loggerLevel: basic

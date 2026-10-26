@@ -2,6 +2,8 @@ package com.spzx.product.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spzx.common.core.exception.ServiceException;
 import com.spzx.common.core.utils.bean.BeanUtils;
 import com.spzx.product.api.domain.Product;
@@ -11,6 +13,7 @@ import com.spzx.product.api.domain.vo.SkuPrice;
 import com.spzx.product.api.domain.vo.SkuQuery;
 import com.spzx.product.api.domain.vo.SkuStockVo;
 import com.spzx.product.domain.SkuStock;
+import com.spzx.product.domain.vo.AiSkuView;
 import com.spzx.product.mapper.ProductDetailsMapper;
 import com.spzx.product.mapper.ProductMapper;
 import com.spzx.product.mapper.ProductSkuMapper;
@@ -355,6 +358,70 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         BeanUtils.copyProperties(skuStock, skuStockVo);
         return skuStockVo;
     }
+
+    /**
+     * 面向 AI 客服的 SKU 视图。
+     *
+     * <p>两个坑：
+     * 1. product_sku 表里没有库存字段，可用库存在 sku_stock.available_num，得单独查；
+     * 2. sku_spec 是"白色 + 8G"这种拼好的文本，规格名（颜色/内存）在 product.spec_value
+     * 的 JSON 里，两者按顺序一一对应，拼起来才能给客服一句人话。</p>
+     */
+    @Override
+    public AiSkuView getAiSkuView(Long skuId) {
+        ProductSku productSku = getProductSku(skuId);
+        if (productSku == null) {
+            return null;
+        }
+
+        AiSkuView view = new AiSkuView();
+        view.setProductId(productSku.getId());
+        view.setTitle(productSku.getSkuName());
+        view.setPrice(productSku.getSalePrice());
+        view.setMarketPrice(productSku.getMarketPrice());
+        view.setSpecs(productSku.getSkuSpec());
+        view.setImageUrl(productSku.getThumbImg());
+
+        Product product = productMapper.selectById(productSku.getProductId());
+        if (product != null) {
+            view.setProductName(product.getName());
+        }
+        view.setAttributes(buildSpecAttributes(product == null ? null : product.getSpecValue(), productSku.getSkuSpec()));
+
+        SkuStock skuStock = skuStockMapper.selectOne(new LambdaQueryWrapper<SkuStock>().eq(SkuStock::getSkuId, skuId));
+        int availableNum = (skuStock == null || skuStock.getAvailableNum() == null) ? 0 : skuStock.getAvailableNum();
+        view.setStockNum(availableNum);
+        view.setStockStatus(availableNum > 0 ? "有货，可售 " + availableNum + " 件" : "暂时无货");
+        return view;
+    }
+
+    /**
+     * 把 product.spec_value 的规格名按顺序和 sku_spec 的值对齐，得到 {"颜色":"白色","内存":"8G"}。
+     * 任何一步解析失败都退化成 {"规格":"白色 + 8G"}，不抛异常——客服拿不到结构化规格也要能答话。
+     */
+    private Map<String, Object> buildSpecAttributes(String specValueJson, String skuSpec) {
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        if (skuSpec == null || skuSpec.isBlank()) {
+            return attributes;
+        }
+        String[] values = skuSpec.split("\\s*\\+\\s*");
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(specValueJson == null ? "[]" : specValueJson);
+            if (root != null && root.isArray() && root.size() == values.length) {
+                for (int i = 0; i < values.length; i++) {
+                    String key = root.get(i).path("key").asText("");
+                    attributes.put(key.isBlank() ? "规格" + (i + 1) : key, values[i]);
+                }
+                return attributes;
+            }
+        } catch (Exception ignored) {
+            //规格 JSON 脏了不影响主流程，走下面的兜底
+        }
+        attributes.put("规格", skuSpec);
+        return attributes;
+    }
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     /**
      * 校验库存并锁定库存，返回空字符串表示成功，非空表示库存不足的原因
