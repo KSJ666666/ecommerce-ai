@@ -1,0 +1,83 @@
+######################################################################
+# 根级 .gitignore —— 三个子项目各自的 .gitignore 是更细的补充
+######################################################################
+
+# ---------- 敏感信息（最重要）----------
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.jks
+*.p12
+*.pem
+*.key
+
+# ---------- Java / Maven 构建产物 ----------
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+dependency-reduced-pom.xml
+!.mvn/wrapper/maven-wrapper.jar
+
+# ---------- Python ----------
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---------- 前端 ----------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+npm-debug.log*
+yarn-error.log*
+
+# ---------- 本地模型与运行产物 ----------
+models/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+*.pkl
+temp_data/
+temp-files/
+temp_dir/
+**/temp_data/
+**/temp-files/
+md/
+output/
+logs/
+**/logs/
+*.log
+*.pid
+
+# ---------- IDE / 系统 ----------
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+
+# ---------- 本仓库的中间产物 ----------
+backup/
+.workbuddy/
