@@ -544,14 +544,16 @@ if __name__ == "__main__":
     )
 
     # 1. 保证项目根可导入 + 加载环境变量（DashScope / VLM 模型）
-    PROJECT_ROOT = r"D:\code\shopkeeper_brain"
+    from knowledge.core.paths import LOCAL_BASE_DIR
+
+    PROJECT_ROOT = os.path.dirname(LOCAL_BASE_DIR)
     sys.path.insert(0, PROJECT_ROOT)
     env_path = os.path.join(PROJECT_ROOT, "knowledge", ".env")
     if os.path.exists(env_path):
         load_dotenv(env_path)
 
-    # 2. 使用真实 md 文件作为测试素材
-    md_path = r"D:\code\shopkeeper_brain\docs\万用表的使用_layout\hybrid_auto\万用表的使用_layout.md"
+    # 2. 使用 temp_data 下的 md 文件作为测试素材
+    md_path = os.path.join(LOCAL_BASE_DIR, "万用表的使用_layout.md")
     print(f"测试 md: {md_path}")
 
     # 3. 运行节点完整流程

@@ -194,11 +194,11 @@ class ImportMilvusNode(BaseNode):
 def _cli_main() -> None:
     import json
     from pathlib import Path
+    from knowledge.core.paths import LOCAL_BASE_DIR
+
     setup_logging()
 
-    temp_dir = Path(
-        r"D:\develop\develop\workspace\pycharm\BJ251208\shopkeeper_brain\knowledge\processor\import_processor\temp_dir"
-        )
+    temp_dir = Path(LOCAL_BASE_DIR)
     input_path = temp_dir / "chunks_vector_bak.json"
     output_path = temp_dir / "chunks_vector_ids.json"
 

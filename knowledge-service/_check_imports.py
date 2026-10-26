@@ -4,7 +4,7 @@
 import ast
 from pathlib import Path
 
-ROOT = Path(r"D:\code\shopkeeper_brain")
+ROOT = Path(__file__).resolve().parent
 PKG = ROOT / "knowledge"
 SKIP = {"__pycache__", "temp_data", "temp_dir"}
 

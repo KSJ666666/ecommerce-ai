@@ -22,7 +22,7 @@ def create_app():
     """
 
     # 1. 实例化
-    app = FastAPI(description="掌柜智库查询的应用", version="v1.0")
+    app = FastAPI(description="知识库服务 - 查询接口", version="v1.0")
 
     # 2. 跨域配置
     app.add_middleware(

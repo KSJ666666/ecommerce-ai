@@ -1,16 +1,29 @@
-# 这是一个示例 Python 脚本。
+"""知识库服务本地启动入口。
 
-# 按 Shift+F10 执行或将其替换为您的代码。
-# 按 双击 Shift 在所有地方搜索类、文件、工具窗口、操作和设置。
+用法：
+    python main.py            # 启动查询服务 8001（联调时用这个）
+    python main.py import     # 启动导入服务 8000（往知识库灌文档时才用）
+
+注意：两个服务都会加载 BGE-M3（约 2GB 显存），不要同时开，
+      否则会 Segmentation fault —— 正确姿势是停 8001 → 导入 → 重开 8001。
+"""
+import sys
+
+import uvicorn
+
+QUERY_APP = "knowledge.api.query_router:create_app"
+IMPORT_APP = "knowledge.api.import_router:create_app"
 
 
-def print_hi(name):
-    # 在下面的代码行中使用断点来调试脚本。
-    print(f'Hi, {name}')  # 按 Ctrl+F8 切换断点。
+def main() -> None:
+    mode = sys.argv[1] if len(sys.argv) > 1 else "query"
+    if mode == "import":
+        print("[knowledge-service] 启动导入服务 http://127.0.0.1:8000")
+        uvicorn.run(IMPORT_APP, factory=True, host="127.0.0.1", port=8000)
+    else:
+        print("[knowledge-service] 启动查询服务 http://127.0.0.1:8001")
+        uvicorn.run(QUERY_APP, factory=True, host="127.0.0.1", port=8001)
 
 
-# 按装订区域中的绿色按钮以运行脚本。
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# 访问 https://www.jetbrains.com/help/pycharm/ 获取 PyCharm 帮助
+if __name__ == "__main__":
+    main()

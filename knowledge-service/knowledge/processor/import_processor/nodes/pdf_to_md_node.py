@@ -129,13 +129,15 @@ class PdfToMdNode(BaseNode):
 # 测试
 ###########################################
 if __name__ == '__main__':
+    from knowledge.core.paths import LOCAL_BASE_DIR
+
     setup_logging()
     # 1. 构建节点实例
     pdf_to_md_node = PdfToMdNode()
-    # 2. 构建该节点状态
+    # 2. 构建该节点状态（把待解析的 pdf 放到 knowledge/temp_data 下）
     init_state = {
-        "import_file_path": r"D:\code\shopkeeper_brain\docs\万用表的使用_layout.pdf",
-        "file_dir": r"D:\code\shopkeeper_brain\docs "
+        "import_file_path": str(Path(LOCAL_BASE_DIR) / "万用表的使用_layout.pdf"),
+        "file_dir": LOCAL_BASE_DIR
     }
     # 3. 直接调用process
     result = pdf_to_md_node.process(init_state)

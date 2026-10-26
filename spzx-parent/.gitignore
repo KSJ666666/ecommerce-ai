@@ -83,9 +83,3 @@ tmp/
 *.xml.versionsBackup
 .DS_Store
 Thumbs.db
-
-# 电商客服服务是独立项目，不在本仓库管理（历史里曾有一个初始化提交）
-customer-service-backend/
-ecommerce-service-backend/
-shopkeeper_brain/
-.workbuddy/

@@ -56,7 +56,7 @@ def create_fastapi()->FastAPI:
     :return:
     """
     #1.创建fastapi实例，
-    app = FastAPI(description="shopkeeper_fastapi实例")
+    app = FastAPI(description="知识库服务 - 文档导入接口")
     #注册路由\
 
     #2.配置CORS跨域资源共享

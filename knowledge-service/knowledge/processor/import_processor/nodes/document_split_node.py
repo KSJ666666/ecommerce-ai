@@ -336,9 +336,11 @@ class DocumentSplitNode(BaseNode):
 
 
 if __name__ == '__main__':
+    from knowledge.core.paths import LOCAL_BASE_DIR
+
     document_split_node = DocumentSplitNode()
 
-    md_path = r"D:\develop\develop\workspace\pycharm\BJ251208\shopkeeper_brain\knowledge\processor\import_processor\temp_dir\万用表的使用_new.md"
+    md_path = os.path.join(LOCAL_BASE_DIR, "万用表的使用_new.md")
 
     with open(md_path, "r", encoding="utf-8") as f:
         md_content = f.read()
@@ -346,6 +348,6 @@ if __name__ == '__main__':
     init_state = {
         "md_content": md_content,
         "file_title": "万用表的使用",
-        "file_dir": r"D:\develop\develop\workspace\pycharm\BJ251208\shopkeeper_brain\knowledge\processor\import_processor\temp_dir"
+        "file_dir": LOCAL_BASE_DIR
     }
     document_split_node.process(init_state)

@@ -1,131 +1,262 @@
-<p align="center">
-	<img alt="logo" src="https://oscimg.oschina.net/oscnet/up-b99b286755aef70355a7084753f89cdb7c9.png">
-</p>
-<h1 align="center" style="margin: 30px 0 30px; font-weight: bold;">RuoYi v3.6.3</h1>
-<h4 align="center">基于 Vue/Element UI 和 Spring Boot/Spring Cloud & Alibaba 前后端分离的分布式微服务架构</h4>
-<p align="center">
-	<a href="https://gitee.com/y_project/RuoYi-Cloud/stargazers"><img src="https://gitee.com/y_project/RuoYi-Cloud/badge/star.svg?theme=dark"></a>
-	<a href="https://gitee.com/y_project/RuoYi-Cloud"><img src="https://img.shields.io/badge/RuoYi-v3.6.3-brightgreen.svg"></a>
-	<a href="https://gitee.com/y_project/RuoYi-Cloud/blob/master/LICENSE"><img src="https://img.shields.io/github/license/mashape/apistatus.svg"></a>
-</p>
+# spzx —— 电商业务后端（Spring Cloud 微服务）
 
-## 平台简介
+电商 AI 三方联调中的**业务基座**：商品、订单、购物车、支付、用户等能力都在这里。
+AI 客服（`../customer-service-backend`）通过 HTTP 内部接口读取订单/物流/商品数据，不直连数据库。
 
-若依是一套全部开源的快速开发平台，毫无保留给个人及企业免费使用。
+```
+浏览器 / H5  ──> spzx-gateway(8080) ──> spzx-product(9205) / spzx-order(9207) / ...
+                                              ▲
+                                              │ 内部接口 + from-source: inner
+                                      客服服务(18082)
+```
 
-* 采用前后端分离的模式，微服务版本前端(基于 [RuoYi-Vue](https://gitee.com/y_project/RuoYi-Vue))。
-* 后端采用Spring Boot、Spring Cloud & Alibaba。
-* 注册中心、配置中心选型Nacos，权限认证使用Redis。
-* 流量控制框架选型Sentinel，分布式事务选型Seata。
-* 提供了技术栈（[Vue3](https://v3.cn.vuejs.org) [Element Plus](https://element-plus.org/zh-CN) [Vite](https://cn.vitejs.dev)）版本[RuoYi-Cloud-Vue3](https://github.com/yangzongzhuan/RuoYi-Cloud-Vue3)，保持同步更新。
-* 如需不分离应用，请移步 [RuoYi](https://gitee.com/y_project/RuoYi)，如需分离应用，请移步 [RuoYi-Vue](https://gitee.com/y_project/RuoYi-Vue)
-* 阿里云折扣场：[点我进入](http://aly.spzx.vip)，腾讯云秒杀场：[点我进入](http://txy.spzx.vip)&nbsp;&nbsp;
-* 阿里云优惠券：[点我领取](https://www.aliyun.com/minisite/goods?userCode=brki8iof&share_source=copy_link)，腾讯云优惠券：[点我领取](https://cloud.tencent.com/redirect.php?redirect=1025&cps_key=198c8df2ed259157187173bc7f4f32fd&from=console)&nbsp;&nbsp;
+> 本项目基于 RuoYi-Cloud 微服务脚手架改造，业务侧为通用电商场景实现
+> （商品/订单/购物车/支付/用户），并在订单/商品模块补了一层**面向 AI 客服的聚合接口**（见第五节）。
 
-#### 友情链接 [若依/RuoYi-Cloud](https://gitee.com/zhangmrit/spzx-cloud) Ant Design版本。
+---
 
-## 系统模块
+## 一、技术栈
 
-~~~
-com.spzx     
-├── spzx-ui              // 前端框架 [80]
-├── spzx-gateway         // 网关模块 [8080]
-├── spzx-auth            // 认证中心 [9200]
-├── spzx-api             // 接口模块
-│       └── spzx-api-system                          // 系统接口
-├── spzx-common          // 通用模块
-│       └── spzx-common-core                         // 核心模块
-│       └── spzx-common-datascope                    // 权限范围
-│       └── spzx-common-datasource                   // 多数据源
-│       └── spzx-common-log                          // 日志记录
-│       └── spzx-common-redis                        // 缓存服务
-│       └── spzx-common-seata                        // 分布式事务
-│       └── spzx-common-security                     // 安全模块
-│       └── spzx-common-swagger                      // 系统接口
-├── spzx-modules         // 业务模块
-│       └── spzx-system                              // 系统模块 [9201]
-│       └── spzx-gen                                 // 代码生成 [9202]
-│       └── spzx-job                                 // 定时任务 [9203]
-│       └── spzx-file                                // 文件服务 [9300]
-├── spzx-visual          // 图形化管理模块
-│       └── spzx-visual-monitor                      // 监控中心 [9100]
-├──pom.xml                // 公共依赖
-~~~
+| 组件 | 版本 | 说明 |
+|---|---|---|
+| JDK | 21 | 编译目标 21，代码使用 `switch` 表达式等新语法 |
+| Spring Boot | 3.0.5 | |
+| Spring Cloud | 2022.0.2 | |
+| Spring Cloud Alibaba | 2022.0.0.0-RC2 | Nacos 注册/配置中心 |
+| MyBatis-Plus | 3.5.3.1 | |
+| MySQL | 8.0 | 分库：每个微服务一个库 |
+| Redis | 6/7 | 购物车、防重令牌、商品缓存、验证码 |
+| RabbitMQ | 3.x | 延迟消息取消超时未支付订单（需 `x-delayed-message` 插件） |
+| Nacos | 2.x | 配置中心 + 注册中心 |
+| Vue3 + Vite + Element Plus | — | `spzx-ui` 管理端 / H5 |
 
-## 架构图
+---
 
-<img src="https://oscimg.oschina.net/oscnet/up-82e9722ecb846786405a904bafcf19f73f3.png"/>
+## 二、模块结构
 
-## 内置功能
+```
+spzx-parent
+├── spzx-gateway            网关，统一入口                      8080
+├── spzx-auth               登录认证，发 JWT                     9200
+├── spzx-api                微服务之间共享的接口与实体（Feign 契约）
+│   ├── spzx-api-product        ProductSku / SkuStockVo / RemoteProductService
+│   ├── spzx-api-order          OrderInfo / OrderItem / RemoteOrderInfoService
+│   ├── spzx-api-cart           CartInfo / RemoteCartService
+│   ├── spzx-api-user           UserInfo / UserAddress / RemoteUserInfoService
+│   └── spzx-api-system         SysUser / SysDictData / RemoteUserService
+├── spzx-common             公共能力
+│   ├── spzx-common-core        统一响应 R/AjaxResult、BaseEntity、异常
+│   ├── spzx-common-security    @InnerAuth 内部调用鉴权、@RequiresLogin
+│   ├── spzx-common-redis       RedisTemplate 封装、缓存切面
+│   ├── spzx-common-rabbit      RabbitService（普通/延迟消息）
+│   ├── spzx-common-log         操作日志切面
+│   ├── spzx-common-datasource  多数据源
+│   ├── spzx-common-datascope   数据权限
+│   └── spzx-common-seata       分布式事务（本项目未启用）
+├── spzx-modules            业务微服务
+│   ├── spzx-product            商品/SKU/库存                   9205
+│   ├── spzx-user               会员/收货地址                    9206
+│   ├── spzx-order              下单/订单/物流                   9207
+│   ├── spzx-channel            渠道（占位）                     9208
+│   ├── spzx-cart               购物车                           9209
+│   ├── spzx-payment            支付宝沙箱支付                    9210
+│   ├── spzx-system             系统管理（脚手架自带）             9201
+│   ├── spzx-gen                代码生成（脚手架自带）             9202
+│   ├── spzx-job                定时任务（脚手架自带）             9203
+│   └── spzx-file               文件/MinIO 上传                  9300
+├── spzx-visual/spzx-monitor  Spring Boot Admin 监控             9100
+├── spzx-ui                  Vue3 管理端 + H5 商城                 80
+├── docker                   中间件编排参考
+└── sql                      AI 客服联调用的演示订单脚本
+```
 
-1.  用户管理：用户是系统操作者，该功能主要完成系统用户配置。
-2.  部门管理：配置系统组织机构（公司、部门、小组），树结构展现支持数据权限。
-3.  岗位管理：配置系统用户所属担任职务。
-4.  菜单管理：配置系统菜单，操作权限，按钮权限标识等。
-5.  角色管理：角色菜单权限分配、设置角色按机构进行数据范围权限划分。
-6.  字典管理：对系统中经常使用的一些较为固定的数据进行维护。
-7.  参数管理：对系统动态配置常用参数。
-8.  通知公告：系统通知公告信息发布维护。
-9.  操作日志：系统正常操作日志记录和查询；系统异常信息日志记录和查询。
-10. 登录日志：系统登录日志记录查询包含登录异常。
-11. 在线用户：当前系统中活跃用户状态监控。
-12. 定时任务：在线（添加、修改、删除)任务调度包含执行结果日志。
-13. 代码生成：前后端代码的生成（java、html、xml、sql）支持CRUD下载 。
-14. 系统接口：根据业务代码自动生成相关的api接口文档。
-15. 服务监控：监视当前系统CPU、内存、磁盘、堆栈等相关信息。
-16. 在线构建器：拖动表单元素生成相应的HTML代码。
-17. 连接池监视：监视当前系统数据库连接池状态，可进行分析SQL找出系统性能瓶颈。
+**三方联调真正需要启动的只有**：`spzx-product`、`spzx-order`（外加 Nacos/MySQL/Redis/RabbitMQ）。
+`cart`/`payment`/`gateway`/`auth` 只在跑完整购物链路（下单→支付）时才需要。
 
-## 在线体验
+---
 
-- admin/admin123  
-- 陆陆续续收到一些打赏，为了更好的体验已用于演示服务器升级。谢谢各位小伙伴。
+## 三、环境要求
 
-演示地址：http://spzx.vip  
-文档地址：http://doc.spzx.vip
+| 依赖 | 要求 | 检查方式 |
+|---|---|---|
+| JDK | 17+（推荐 21） | `java -version` |
+| Maven | 3.6+ | `mvn -v` |
+| MySQL | 8.0 | `mysql -uroot -p -e "select 1"` |
+| Redis | 6/7，需密码（配置里是 `123456`） | `redis-cli -a 123456 ping` |
+| RabbitMQ | 3.x + 延迟消息插件（延迟取消订单用） | 管理台 15672 |
+| Nacos | 2.x 单机即可 | `http://127.0.0.1:8848/nacos` |
+| Node | 18+（只有改前端时用） | `node -v` |
 
-## 演示图
+### 数据库
 
-<table>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/cd1f90be5f2684f4560c9519c0f2a232ee8.jpg"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/1cbcf0e6f257c7d3a063c0e3f2ff989e4b3.jpg"/></td>
-    </tr>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-8074972883b5ba0622e13246738ebba237a.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-9f88719cdfca9af2e58b352a20e23d43b12.png"/></td>
-    </tr>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-39bf2584ec3a529b0d5a3b70d15c9b37646.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-4148b24f58660a9dc347761e4cf6162f28f.png"/></td>
-    </tr>
-	<tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-b2d62ceb95d2dd9b3fbe157bb70d26001e9.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-d67451d308b7a79ad6819723396f7c3d77a.png"/></td>
-    </tr>	 
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/5e8c387724954459291aafd5eb52b456f53.jpg"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/644e78da53c2e92a95dfda4f76e6d117c4b.jpg"/></td>
-    </tr>
-	<tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-8370a0d02977eebf6dbf854c8450293c937.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-49003ed83f60f633e7153609a53a2b644f7.png"/></td>
-    </tr>
-	<tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-d4fe726319ece268d4746602c39cffc0621.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-c195234bbcd30be6927f037a6755e6ab69c.png"/></td>
-    </tr>
-	<tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-ece3fd37a3d4bb75a3926e905a3c5629055.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-92ffb7f3835855cff100fa0f754a6be0d99.png"/></td>
-    </tr>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-ff9e3066561574aca73005c5730c6a41f15.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-5e4daac0bb59612c5038448acbcef235e3a.png"/></td>
-    </tr>
-</table>
+各微服务独立库，需先建库并导入各自表结构与数据：
 
+| 库名 | 归属服务 |
+|---|---|
+| `spzx-product` | spzx-product |
+| `spzx-order` | spzx-order |
+| `spzx-user` | spzx-user |
+| `spzx-system` | spzx-system / spzx-auth |
+| `spzx-payment` | spzx-payment |
 
-## 若依微服务交流群
+连接信息不写在代码里，统一在 **Nacos 的 `spzx-xxx-dev.yml`** 中（见下）。
 
-QQ群： [![加入QQ群](https://img.shields.io/badge/已满-42799195-blue.svg)](https://jq.qq.com/?_wv=1027&k=yqInfq0S) [![加入QQ群](https://img.shields.io/badge/已满-170157040-blue.svg)](https://jq.qq.com/?_wv=1027&k=Oy1mb3p8) [![加入QQ群](https://img.shields.io/badge/已满-130643120-blue.svg)](https://jq.qq.com/?_wv=1027&k=rvxkJtXK) [![加入QQ群](https://img.shields.io/badge/已满-225920371-blue.svg)](https://jq.qq.com/?_wv=1027&k=0Ck3PvTe) [![加入QQ群](https://img.shields.io/badge/已满-201705537-blue.svg)](https://jq.qq.com/?_wv=1027&k=FnHHP4TT) [![加入QQ群](https://img.shields.io/badge/已满-236543183-blue.svg)](https://jq.qq.com/?_wv=1027&k=qdT1Ojpz) [![加入QQ群](https://img.shields.io/badge/已满-213618602-blue.svg)](https://jq.qq.com/?_wv=1027&k=nw3OiyXs) [![加入QQ群](https://img.shields.io/badge/已满-148794840-blue.svg)](https://jq.qq.com/?_wv=1027&k=kiU5WDls) [![加入QQ群](https://img.shields.io/badge/已满-118752664-blue.svg)](https://jq.qq.com/?_wv=1027&k=MtBy6YfT) [![加入QQ群](https://img.shields.io/badge/已满-101038945-blue.svg)](https://jq.qq.com/?_wv=1027&k=FqImHgH2) [![加入QQ群](https://img.shields.io/badge/128355254-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=G4jZ4EtdT50PhnMBudTnEwgonxkXOscJ&authKey=FkGHYfoTKlGE6wHdKdjH9bVoOgQjtLP9WM%2Fj7pqGY1msoqw9uxDiBo39E2mLgzYg&noverify=0&group_code=128355254) 点击按钮入群。
+### Nacos 配置
+
+启动前 Nacos 中必须存在以下 dataId（group 均为 `DEFAULT_GROUP`）：
+
+```
+application-dev.yml        # 共享：Feign 超时、sentinel 开关、actuator
+spzx-gateway-dev.yml
+spzx-auth-dev.yml
+spzx-product-dev.yml       # 数据源、Redis、RabbitMQ、MyBatis-Plus
+spzx-order-dev.yml
+spzx-user-dev.yml
+spzx-payment-dev.yml       # 含支付宝沙箱参数
+spzx-file-dev.yml          # MinIO
+spzx-system-dev.yml / spzx-gen-dev.yml / spzx-job-dev.yml / spzx-channel-dev.yml / spzx-cart-dev.yml
+sentinel-spzx-gateway      # 网关限流规则（JSON）
+```
+
+`spzx-product-dev.yml` 的关键片段（其余服务同构，只改库名）：
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/spzx-product?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: 你的密码
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: 123456
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
+```
+
+> 换机器部署时，改 Nacos 里的配置即可，不用改代码；`bootstrap.yml` 里只留 Nacos 地址和端口。
+
+---
+
+## 四、启动
+
+### 方式一：IDEA（日常开发）
+
+1. 打开 `spzx-parent`，确认 Project SDK 为 21、Maven 已加载完依赖。
+2. 依次启动 `SpzxProductApplication`(9205)、`SpzxOrderApplication`(9207)。
+3. 需要完整购物链路时再启动 `spzx-gateway`、`spzx-auth`、`spzx-user`、`spzx-cart`、`spzx-payment`。
+
+### 方式二：命令行打包后运行
+
+```bash
+# 只打三方联调需要的两个模块（-am 会一并编译 spzx-api / spzx-common 等依赖模块）
+mvn -DskipTests -pl spzx-modules/spzx-order,spzx-modules/spzx-product -am package
+
+java -jar spzx-modules/spzx-product/target/spzx-product.jar --server.port=9205
+java -jar spzx-modules/spzx-order/target/spzx-order.jar   --server.port=9207
+```
+
+> 显式带 `--server.port` 是有原因的：Spring Boot 会读环境变量 `SERVER_PORT`，
+> 有些工具/容器会注入它，导致服务跑到随机端口上（本机踩过 `49247` 的坑）。
+
+### 演示数据（重要）
+
+真实下单产生的 `order_no` 是 32 位 UUID，让用户在对话框里手打不现实；而且历史订单大多已取消。
+执行下面脚本会插入 4 条**可读订单号**的演示订单（待付款/待发货/已发货/已完成各一条），幂等可重复执行：
+
+```bash
+mysql -uroot -p --default-character-set=utf8mb4 < sql/ai_demo_orders.sql
+```
+
+得到：`SP202610260001`（待发货）、`SP202610260002`（已发货）、`SP202610260003`（已完成）、`SP202610260004`（待付款）。
+
+---
+
+## 五、面向 AI 客服的内部接口
+
+AI 客服不直连数据库，也不需要理解 `OrderInfo` 实体里那堆用不上的字段，
+本模块对外提供了三个「聚合视图」接口。它们和 Feign 内部调用走同一套鉴权：
+**请求头必须带 `from-source: inner`**，否则返回 `{"code":500,"msg":"没有内部访问权限，不允许访问"}`。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/orderInfo/inner/ai/{orderNo}` | 订单聚合视图：状态文案、金额、收货信息（手机号脱敏）、商品明细 |
+| GET | `/orderInfo/inner/logistics/{orderNo}` | 物流状态：按订单状态机推导（未接入承运商，运单号为空） |
+| GET | `/product/inner/ai/sku/{skuId}` | SKU 聚合视图：名称、售价、可用库存、规格键值对 |
+
+示例：
+
+```bash
+curl "http://127.0.0.1:9207/orderInfo/inner/ai/SP202610260001" -H "from-source: inner"
+# {"code":200,"data":{"orderNo":"SP202610260001","orderStatus":1,
+#  "statusDesc":"商家正在备货，尚未发货","totalAmount":1999.00,
+#  "receiverName":"孔少杰","receiverPhoneMasked":"137****2456",
+#  "receiverAddress":"河南省新乡市牧野区建设东路46号","createTime":"2026-10-26 09:27",
+#  "items":[{"productId":3,"title":"小米 红米Note10 5G手机 红色 + 8G","quantity":1,"price":1999.00}]}}
+
+curl "http://127.0.0.1:9205/product/inner/ai/sku/3" -H "from-source: inner"
+```
+
+**为什么不让客服直接调实体接口？** 后台改一个字段名就会把 AI 链路打挂；
+聚合视图是双方约定的稳定契约，字段增减只影响本模块的 `AiOrderView` / `AiSkuView`，
+客服侧（`app/infrastructure/commerce_spzx.py`）只是几个字段改名，不动业务逻辑。
+
+其他内部接口（供 Feign 使用）：`/orderInfo/inner/getOrderInfo/{orderNo}`、
+`/orderInfo/inner/updateOrderStatus/{orderNo}/{orderStatus}`、
+`/product/getProductSku/{skuId}`、`/product/checkStockAndSubStock/{skuId}/{skuNum}`、
+`/product/unlockStock/{skuId}/{skuNum}`。
+
+---
+
+## 六、与 AI 服务联调
+
+客服服务（`../customer-service-backend`）的 `.env` 指向本项目的两个服务：
+
+```ini
+SPZX_ORDER_BASE_URL=http://127.0.0.1:9207
+SPZX_PRODUCT_BASE_URL=http://127.0.0.1:9205
+```
+
+启动顺序：Nacos/MySQL/Redis/RabbitMQ → `spzx-product` → `spzx-order` → 客服服务(18082) → 知识库服务(8001)。
+
+验证：
+
+```bash
+cd ..            # 到联调包根目录
+python verify_e2e.py           # 端口 + 健康接口
+python verify_e2e.py --full    # 端到端对话
+```
+
+实测对话（客服 → 本服务）：
+
+```
+用户：帮我查订单状态
+客服：请告诉我你的订单号。
+用户：SP202610260001
+客服：订单SP202610260001当前状态是：商家正在备货，尚未发货。订单金额 ¥1999.00。商品：小米 红米Note10 5G手机 红色 + 8G。
+```
+
+---
+
+## 七、常见问题
+
+| 现象 | 原因与处理 |
+|---|---|
+| 启动后端口不是 9205/9207 | 环境变量 `SERVER_PORT` 覆盖了配置，启动参数显式加 `--server.port=9207` |
+| 调内部接口返回 `code:500 没有内部访问权限` | 少了请求头 `from-source: inner` |
+| `No spring.config.import property has been defined` | 缺 `bootstrap.yml` 或没引 `spring-cloud-starter-bootstrap` |
+| 启动卡在 `Located property source` 后报 Nacos 超时 | Nacos 没起，或 `bootstrap.yml` 里的地址/命名空间不对 |
+| `Table 'spzx-product.product_sku' doesn't exist` | 库没建或没导数据，见第三节 |
+| Feign 调用报 `Read timed out` | `application-dev.yml` 里 `feign.client.config.default.readTimeout` 默认 30s，慢接口需放宽 |
+| 购物车/令牌相关接口 500 | Redis 密码不对，检查 Nacos 中 `spring.data.redis.password` |
+| `mvn` 报 `invalid target release: 21` | 本机 `JAVA_HOME` 指向 JDK8，临时切到 21：`set JAVA_HOME=D:\develop\Java\jdk-21` |
+
+---
+
+## 八、许可
+
+基于 MIT 许可的开源微服务脚手架改造，许可声明见 `LICENSE`。

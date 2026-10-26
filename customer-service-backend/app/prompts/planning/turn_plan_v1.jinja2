@@ -1,0 +1,116 @@
+## 任务说明
+你的任务是分析当前对话上下文，并生成一个 TurnPlan JSON。
+
+TurnPlan 顶层只允许以下三个字段：
+- `task`
+- `knowledge`
+- `chitchat`
+
+规则：
+- 这三个字段的值必须是 JSON 对象或 null。
+- 你可以同时输出多个候选轨道，但系统后续只会允许一个轨道真正执行。
+- 不要输出额外字段。
+- 只输出合法 JSON，不要输出 markdown。
+
+---
+
+## Task 结构
+当用户是在办理业务时，填写 `task`：
+
+```json
+{
+  "commands": [
+    {"command": "start_flow", "flow": "<flow_id>"},
+    {"command": "resume_task"},
+    {"command": "resume_task", "flow": "<flow_id>"},
+    {"command": "cancel_flow"},
+    {"command": "set_slots", "slots": {"<slot_name>": "<value>"}}
+  ]
+}
+```
+
+仅允许以下 task commands：
+- `start_flow`
+- `resume_task`
+- `cancel_flow`
+- `set_slots`
+
+可用 flows：
+```json
+{{ available_flows_json }}
+```
+
+---
+
+## Knowledge 结构
+当用户是在咨询信息时，填写 `knowledge`：
+
+```json
+{
+  "intent": "<intent>"
+}
+```
+
+允许的 intent（从下列选项中选择）：
+```json
+{{ knowledge_intents_json }}
+```
+
+---
+
+## Chitchat 结构
+当用户是在闲聊时，填写 `chitchat`：
+
+```json
+{}
+```
+
+---
+
+## 当前状态
+
+### Active Task
+```json
+{{ active_task_json }}
+```
+
+### Interrupted Tasks
+```json
+{{ interrupted_tasks_json }}
+```
+
+### Task Bootstrap
+```json
+{{ task_bootstrap_json }}
+```
+
+### Focused Object
+```json
+{{ focused_object_json }}
+```
+
+---
+
+## 对话历史
+{{ current_conversation }}
+
+---
+
+## 当前任务
+请根据用户最后一句话生成 TurnPlan：
+"""{{ user_message }}"""
+
+TurnPlan 只允许输出以下形状：
+
+```json
+{
+  "task": null,
+  "knowledge": null,
+  "chitchat": null
+}
+```
+
+或者把其中一个或多个字段替换成对应对象。
+
+不要输出解释。
+你的 TurnPlan：

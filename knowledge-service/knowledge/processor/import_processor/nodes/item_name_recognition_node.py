@@ -317,11 +317,12 @@ class ItemNameRecognitionNode(BaseNode):
 if __name__ == '__main__':
     import json
 
+    from knowledge.core.paths import LOCAL_BASE_DIR
+
     setup_logging()
 
     # 1. 读取chunk.json
-    temp_dir = Path(
-        r"D:\code\shopkeeper_brain\docs\temp_dir")
+    temp_dir = Path(LOCAL_BASE_DIR)
 
     chunk_json_path = temp_dir / "chunks.json"
     output_path = temp_dir / "chunks_item_name.json"
