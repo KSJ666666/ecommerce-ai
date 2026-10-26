@@ -1,0 +1,73 @@
+# ===== 密钥与环境变量（绝不能提交）=====
+# knowledge/.env 里有 DashScope / DeepSeek / 智谱 / LangSmith 的真实 key
+.env
+.env.*
+knowledge/.env
+!.env.example
+!knowledge/.env.example
+
+# ===== IDE 配置 =====
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+
+# ===== 虚拟环境 =====
+.venv/
+venv/
+env/
+ENV/
+
+# ===== 测试与缓存 =====
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ===== 日志与本地数据 =====
+*.log
+*.sqlite
+*.db
+logs/
+*.pid
+
+# ===== 本地临时目录与产物 =====
+temp_dir/
+temp_data/
+temp-files/
+knowledge/temp_data/
+md/
+output/
+*_err.txt
+*.err
+
+# ===== 模型与权重文件（体积大，按 README 自行下载）=====
+models/
+*.pkl
+*.onnx
+*.pt
+*.pth
+*.h5
+*.gguf
+*.bin
+*.safetensors
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 文档目录 =====
+docs/

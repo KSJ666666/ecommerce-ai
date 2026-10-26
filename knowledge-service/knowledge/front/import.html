@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
+    <title>文件导入服务</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: rgba(30, 41, 59, 0.72);
+            --card: rgba(15, 23, 42, 0.6);
+            --border: rgba(255, 255, 255, 0.1);
+            --border-soft: rgba(255, 255, 255, 0.06);
+            --text: #e2e8f0;
+            --title: #f8fafc;
+            --muted: #94a3b8;
+            --faint: #64748b;
+            --brand: #38bdf8;
+            --brand2: #818cf8;
+            --ok: #10b981;
+            --warn: #f59e0b;
+            --err: #ef4444;
+            --radius: 16px;
+            --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, Arial, sans-serif;
+            margin: 0;
+            padding: 24px 20px 40px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            color: var(--text);
+            /* 科技感背景 */
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at 15% 50%, rgba(56, 189, 248, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(129, 140, 248, 0.08) 0%, transparent 50%),
+                linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+            background-attachment: fixed;
+        }
+
+        ::selection { background: rgba(56, 189, 248, 0.3); }
+
+        :focus-visible {
+            outline: 2px solid rgba(56, 189, 248, 0.6);
+            outline-offset: 2px;
+            border-radius: 8px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--panel);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 28px 30px 32px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        /* ===== 头部 ===== */
+        .page-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            color: var(--title);
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+        }
+
+        .page-sub {
+            margin: 8px 0 0;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .nav-pill {
+            flex-shrink: 0;
+            font-size: 12px;
+            color: #7dd3fc;
+            text-decoration: none;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            background: rgba(56, 189, 248, 0.08);
+            padding: 8px 14px;
+            border-radius: 999px;
+            transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .nav-pill:hover {
+            background: rgba(56, 189, 248, 0.16);
+            border-color: rgba(56, 189, 248, 0.55);
+            transform: translateY(-1px);
+        }
+
+        /* ===== 上传区 ===== */
+        .upload-area {
+            border: 2px dashed rgba(56, 189, 248, 0.4);
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 14px;
+            padding: 36px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+            margin-bottom: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-area::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.12), transparent 60%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .upload-area:hover,
+        .upload-area.dragging {
+            border-color: var(--brand);
+            background: rgba(56, 189, 248, 0.06);
+            box-shadow: inset 0 0 24px rgba(56, 189, 248, 0.1), 0 0 20px rgba(56, 189, 248, 0.12);
+        }
+
+        .upload-area.dragging {
+            transform: scale(1.01);
+        }
+
+        .upload-area:active {
+            transform: scale(0.99);
+        }
+
+        .upload-area:hover::before,
+        .upload-area.dragging::before { opacity: 1; }
+
+        .upload-icon {
+            font-size: 44px;
+            margin-bottom: 12px;
+            filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.5));
+            transition: transform 0.25s ease;
+        }
+
+        .upload-area:hover .upload-icon,
+        .upload-area.dragging .upload-icon { transform: translateY(-4px); }
+
+        .upload-text {
+            color: var(--muted);
+            font-size: 15px;
+        }
+
+        .upload-text strong { color: #7dd3fc; font-weight: 600; }
+
+        .upload-hint {
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--faint);
+        }
+
+        .file-input { display: none; }
+
+        .foot-hint {
+            text-align: center;
+            font-size: 12px;
+            color: var(--faint);
+            margin: 14px 0 0;
+        }
+
+        /* ===== 文件卡片 ===== */
+        .file-list {
+            margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .file-item {
+            background: var(--card);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+            padding: 18px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 14px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            animation: rise 0.3s ease both;
+        }
+
+        .file-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            border-color: rgba(56, 189, 248, 0.3);
+        }
+
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .file-info {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: #f1f5f9;
+            font-size: 15px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .file-ext {
+            flex-shrink: 0;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            padding: 2px 8px;
+            border-radius: 6px;
+            color: #7dd3fc;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+        }
+
+        .file-size {
+            flex-shrink: 0;
+            font-size: 12px;
+            color: var(--faint);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ===== 状态徽章 ===== */
+        .status-badge {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: white;
+            min-width: 86px;
+            justify-content: center;
+            text-align: center;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-badge::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.95);
+            flex-shrink: 0;
+        }
+
+        .status-uploading { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .status-processing { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+
+        .status-processing::before { animation: blink 1.2s infinite ease-in-out; }
+
+        .status-completed { background: linear-gradient(135deg, #10b981, #059669); }
+
+        .status-completed::before {
+            background: transparent;
+            width: 6px;
+            height: 6px;
+            border-right: 2px solid #fff;
+            border-bottom: 2px solid #fff;
+            border-radius: 0;
+            transform: rotate(-45deg) translate(-1px, -1px);
+        }
+
+        .status-error { background: linear-gradient(135deg, #ef4444, #dc2626); }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.8); }
+        }
+
+        /* ===== 进度条 ===== */
+        .progress-wrapper {
+            margin-top: 8px;
+            display: none;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background-color: rgba(15, 23, 42, 0.8);
+            border-radius: 3px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(
+                    90deg,
+                    rgba(255, 255, 255, 0) 0%,
+                    rgba(255, 255, 255, 0.2) 50%,
+                    rgba(255, 255, 255, 0) 100%
+            );
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 6px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ===== 运行日志（时间线） ===== */
+        .log-details {
+            margin-top: 14px;
+            font-size: 13px;
+            color: #cbd5e1;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.6), rgba(30, 41, 59, 0.4));
+            border-radius: 12px;
+            padding: 14px 18px;
+            border: 1px solid rgba(56, 189, 248, 0.1);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .log-details summary {
+            cursor: pointer;
+            user-select: none;
+            color: var(--text);
+            outline: none;
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 0.3px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-soft);
+        }
+
+        .log-details[open] summary { margin-bottom: 4px; }
+
+        .log-details summary:hover { color: var(--brand); }
+
+        .log-details summary::marker { color: #475569; }
+
+        .log-list {
+            margin: 8px 0 0 0;
+            padding: 0 0 0 20px;
+            list-style: none;
+            max-height: 200px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        /* 时间线竖线 */
+        .log-list::before {
+            content: "";
+            position: absolute;
+            left: 7px;
+            top: 8px;
+            bottom: 8px;
+            width: 2px;
+            background: linear-gradient(180deg, rgba(56, 189, 248, 0.3), rgba(16, 185, 129, 0.3));
+            border-radius: 1px;
+        }
+
+        .log-list::-webkit-scrollbar { width: 6px; }
+
+        .log-list::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 3px;
+        }
+
+        .log-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .log-list::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+        .log-list li {
+            margin: 0;
+            padding: 9px 12px;
+            line-height: 1.5;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            border-radius: 8px;
+            transition: background 0.2s ease;
+        }
+
+        .log-list li:hover { background: rgba(255, 255, 255, 0.03); }
+
+        /* 时间线节点圆点 */
+        .log-list li::before {
+            content: "";
+            position: absolute;
+            left: -17px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 2px solid #334155;
+            background: #1e293b;
+            box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.8);
+            z-index: 1;
+        }
+
+        .log-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .log-done { color: #d1fae5; }
+
+        .log-done::before {
+            background: var(--ok) !important;
+            border-color: var(--ok) !important;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.4), 0 0 0 3px rgba(15, 23, 42, 0.8) !important;
+        }
+
+        .log-duration {
+            margin-left: auto;
+            font-size: 12px;
+            color: #67e8f9;
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            padding: 2px 12px;
+            border-radius: 12px;
+            white-space: nowrap;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+        }
+
+        .log-running {
+            color: #bae6fd;
+            animation: pulseText 2s infinite;
+        }
+
+        .log-running::before {
+            background: #3b82f6 !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5), 0 0 0 3px rgba(15, 23, 42, 0.8) !important;
+            animation: pulseNode 2s infinite !important;
+        }
+
+        @keyframes pulseText {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        @keyframes pulseNode {
+            0%, 100% { box-shadow: 0 0 8px rgba(59, 130, 246, 0.5), 0 0 0 3px rgba(15, 23, 42, 0.8); }
+            50% { box-shadow: 0 0 14px rgba(59, 130, 246, 0.8), 0 0 0 3px rgba(15, 23, 42, 0.8); }
+        }
+
+        @media (max-width: 560px) {
+            .container { padding: 20px 16px 24px; }
+            .page-head { flex-direction: column; align-items: flex-start; }
+            .file-item { flex-direction: column; }
+            .status-badge { align-self: flex-end; margin-top: -6px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header class="page-head">
+        <div>
+            <h1>📄 知识库文件导入</h1>
+            <p class="page-sub">上传 PDF / Markdown，自动完成解析、切分与向量化入库</p>
+        </div>
+        <a class="nav-pill" href="./chat.html">💬 前往知识库问答 →</a>
+    </header>
+
+    <div class="upload-area" id="dropZone" role="button" tabindex="0" aria-label="点击选择或拖拽上传文件">
+        <div class="upload-icon">☁️</div>
+        <div class="upload-text"><strong>点击选择</strong> 或拖拽文件到此处</div>
+        <div class="upload-hint">支持 .pdf / .md 格式，可一次选择多个文件</div>
+        <input type="file" id="fileInput" class="file-input" accept=".pdf,.md" multiple>
+    </div>
+
+    <p class="foot-hint">上传后自动转入后台处理，实时展示各节点进度与耗时</p>
+
+    <div id="fileList" class="file-list">
+    </div>
+</div>
+
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+
+    // 同源优先：页面由后端 /front 提供时直接走当前域名；file:// 单独打开时回退到本机服务
+    const API_BASE = /^https?:$/.test(location.protocol) ? `${location.protocol}//${location.host}` : 'http://127.0.0.1:8000';
+
+    function escapeHtml(str) {
+        return String(str)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function formatSize(bytes) {
+        if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        return (bytes / 1024).toFixed(2) + ' KB';
+    }
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragging');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragging');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragging');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    dropZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    dropZone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fileInput.click();
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+        fileInput.value = ''; // 允许重复选择同一个文件
+    });
+
+    function handleFiles(files) {
+        Array.from(files).forEach(uploadFile);
+    }
+
+    function updateProgressUI(wrapper, percentage) {
+        const bar = wrapper.querySelector('.progress-bar');
+        const text = wrapper.querySelector('.progress-text');
+
+        const safePercentage = Math.min(Math.max(percentage, 0), 100);
+
+        bar.style.width = safePercentage + '%';
+        text.textContent = Math.round(safePercentage) + '%';
+
+        if (safePercentage >= 100) {
+            bar.style.background = 'linear-gradient(90deg, #10b981, #34d399)';
+        } else if (safePercentage < 10) {
+            bar.style.background = 'linear-gradient(90deg, #f59e0b, #fbbf24)';
+        } else {
+            bar.style.background = 'linear-gradient(90deg, #3b82f6, #60a5fa)';
+        }
+    }
+
+    async function uploadFile(file) {
+        // === 核心逻辑优化：动态判断总节点数 ===
+        const isPDF = file.name.toLowerCase().endsWith('.pdf');
+        // PDF 需要 8 步（含上传），MD 跳过 pdf_to_md 需要 7 步
+        const totalNodes = isPDF ? 8 : 7;
+
+        const id = 'file-' + Math.random().toString(36).slice(2, 10);
+        const html = `
+            <div class="file-item" id="${id}">
+                <div class="file-info">
+                    <div class="file-header">
+                        <span class="file-name"><span class="file-ext">${isPDF ? 'PDF' : 'MD'}</span><span class="log-name">${escapeHtml(file.name)}</span></span>
+                        <span class="file-size">${formatSize(file.size)}</span>
+                    </div>
+                    <div class="progress-wrapper">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar"></div>
+                        </div>
+                        <div class="progress-text">0%</div>
+                    </div>
+                    <details class="log-details" open>
+                        <summary>准备上传...</summary>
+                        <ul class="log-list"></ul>
+                    </details>
+                </div>
+                <div class="status-badge status-uploading">上传中...</div>
+            </div>
+        `;
+        fileList.insertAdjacentHTML('afterbegin', html);
+
+        const itemEl = document.getElementById(id);
+        const statusBadge = itemEl.querySelector('.status-badge');
+        const progressWrapper = itemEl.querySelector('.progress-wrapper');
+        const logListEl = itemEl.querySelector('.log-list');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            progressWrapper.style.display = 'block';
+
+            // 使用动态的 totalNodes 计算基础上传进度
+            const uploadPercentage = (1 / totalNodes) * 100;
+            updateProgressUI(progressWrapper, Math.min(uploadPercentage, 10));
+
+            const initialLog = document.createElement('li');
+            initialLog.innerHTML = `<span class="log-name">开始上传文件...</span>`;
+            initialLog.className = "log-running";
+            logListEl.appendChild(initialLog);
+
+            const response = await fetch(`${API_BASE}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Upload failed');
+
+            const result = await response.json();
+            const taskId = result.task_id;
+
+            updateProgressUI(progressWrapper, uploadPercentage);
+            statusBadge.textContent = '处理中';
+            statusBadge.className = 'status-badge status-processing';
+
+            // 把专属的 totalNodes 传给轮询函数
+            pollStatus(taskId, itemEl, totalNodes);
+
+        } catch (error) {
+            console.error(error);
+            statusBadge.textContent = '上传失败';
+            statusBadge.className = 'status-badge status-error';
+            updateProgressUI(progressWrapper, 0);
+
+            const errLog = document.createElement('li');
+            errLog.textContent = "❌ 网络请求失败或服务器异常";
+            errLog.style.color = "#ef4444";
+            logListEl.appendChild(errLog);
+        }
+    }
+
+    function normalizeLogText(text) {
+        if (typeof text !== 'string') return String(text);
+        return text;
+    }
+
+    // 接收 totalNodes 参数计算最终百分比和渲染文案
+    function formatDuration(seconds) {
+        if (seconds < 60) {
+            return seconds.toFixed(1) + 's';
+        }
+        const mins = Math.floor(seconds / 60);
+        const secs = (seconds % 60).toFixed(0);
+        return `${mins}m${secs}s`;
+    }
+
+    function renderLogsAndCalculateProgress(itemEl, doneList, runningList, totalNodes, durations) {
+        const logSummary = itemEl.querySelector('.log-details summary');
+        const logListEl = itemEl.querySelector('.log-list');
+
+        const done = Array.isArray(doneList) ? doneList : [];
+        const running = Array.isArray(runningList) ? runningList : [];
+        const durationMap = durations || {};
+
+        // === 进度计算逻辑 ===
+        let currentPercentage = (done.length / totalNodes) * 100;
+
+        if (running.length > 0) {
+            currentPercentage += (0.5 / totalNodes) * 100;
+        }
+
+        if (currentPercentage >= 100) {
+            currentPercentage = 95;
+        }
+
+        // 计算总耗时
+        let totalDuration = 0;
+        for (const key in durationMap) {
+            totalDuration += durationMap[key];
+        }
+        const totalDurationText = totalDuration > 0 ? ` | 总耗时: ${formatDuration(totalDuration)}` : '';
+
+        // 更新日志文案
+        logSummary.textContent = `📋 运行日志 (已完成: ${done.length}, 进行中: ${running.length}, 共 ${totalNodes} 步${totalDurationText})`;
+
+        logListEl.innerHTML = '';
+
+        for (const item of done) {
+            if (item === 'upload_file') continue;
+
+            const li = document.createElement('li');
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'log-name';
+            nameSpan.textContent = `${normalizeLogText(item)} 节点执行完成`;
+            li.appendChild(nameSpan);
+
+            // 添加耗时标签
+            if (durationMap[item] !== undefined) {
+                const durationSpan = document.createElement('span');
+                durationSpan.className = 'log-duration';
+                durationSpan.textContent = formatDuration(durationMap[item]);
+                li.appendChild(durationSpan);
+            }
+
+            li.className = 'log-done';
+            logListEl.appendChild(li);
+        }
+
+        for (const item of running) {
+            const li = document.createElement('li');
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'log-name';
+            nameSpan.textContent = `正在处理 ${normalizeLogText(item)} 节点...`;
+            li.appendChild(nameSpan);
+            li.className = 'log-running';
+            logListEl.appendChild(li);
+        }
+
+        logListEl.scrollTop = logListEl.scrollHeight;
+
+        return currentPercentage;
+    }
+
+    function pollStatus(taskId, itemEl, totalNodes) {
+        const statusBadge = itemEl.querySelector('.status-badge');
+        const progressWrapper = itemEl.querySelector('.progress-wrapper');
+        const logDetails = itemEl.querySelector('.log-details');
+        let stopped = false;
+
+        const interval = setInterval(async () => {
+            if (stopped) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/status/${taskId}`);
+                if (!res.ok) throw new Error('Status request failed');
+
+                const data = await res.json();
+
+                if (stopped) return;
+
+                // 传入 totalNodes 继续计算
+                const calculatedPercentage = renderLogsAndCalculateProgress(itemEl, data.done_list, data.running_list, totalNodes, data.durations);
+
+                if (data.status === 'completed') {
+                    stopped = true;
+                    clearInterval(interval);
+                    statusBadge.textContent = '已完成';
+                    statusBadge.className = 'status-badge status-completed';
+                    updateProgressUI(progressWrapper, 100);
+
+                    setTimeout(() => {
+                        logDetails.open = false;
+                    }, 1000);
+
+                } else if (data.status === 'failed') {
+                    stopped = true;
+                    clearInterval(interval);
+                    statusBadge.textContent = '失败';
+                    statusBadge.className = 'status-badge status-error';
+
+                    const logListEl = itemEl.querySelector('.log-list');
+                    const errLog = document.createElement('li');
+                    errLog.textContent = "❌ 工作流执行失败中止";
+                    errLog.style.color = "#ef4444";
+                    logListEl.appendChild(errLog);
+
+                } else if (data.status === 'processing') {
+                    updateProgressUI(progressWrapper, calculatedPercentage);
+                }
+            } catch (e) {
+                console.error('Polling error', e);
+            }
+        }, 1500);
+    }
+</script>
+
+</body>
+</html>

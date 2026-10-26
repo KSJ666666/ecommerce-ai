@@ -1,0 +1,27 @@
+# ── Web 层 ──────────────────────────────────────────
+# 参考资料的 requirements 漏了这三个，装完直接跑不起来
+fastapi
+uvicorn
+python-multipart        # UploadFile 文件上传必需，缺了 POST /upload 会报错
+python-dotenv
+
+# ── LLM / Agent ────────────────────────────────────
+langchain-openai
+langgraph
+openai-agents
+grandalf                # langgraph 画流程图用
+
+# ── 向量库与检索 ────────────────────────────────────
+pymilvus[model]
+sentence-transformers
+
+# ── 重排序模型 ──────────────────────────────────────
+# reranker_node.py 里 `from FlagEmbedding import FlagReranker`，
+# 参考资料的 requirements 同样漏了它
+FlagEmbedding
+
+# ── 存储与文档解析 ──────────────────────────────────
+minio
+pymongo
+mineru[all]
+pypdf
